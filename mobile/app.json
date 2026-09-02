@@ -1,0 +1,21 @@
+{
+  "expo": {
+    "name": "FoodBaskets POS",
+    "slug": "fbcpos",
+    "version": "1.0.0",
+    "orientation": "landscape",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "backgroundColor": "#0F172A"
+    },
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.foodbaskets.fbcpos"
+    },
+    "web": {
+      "bundler": "metro"
+    }
+  }
+}

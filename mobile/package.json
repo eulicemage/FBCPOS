@@ -1,19 +1,22 @@
 {
   "name": "@fbcpos/mobile",
   "version": "1.0.0",
+  "main": "expo/AppEntry.js",
   "private": true,
   "scripts": {
-    "start": "react-native start",
-    "android": "react-native run-android",
+    "start": "expo start",
+    "android": "expo start --android",
+    "web": "expo start --web",
     "test": "vitest run"
   },
   "dependencies": {
+    "axios": "^1.7.2",
+    "expo": "~54.0.37",
     "react": "18.2.0",
-    "react-native": "0.74.1",
+    "react-native": "0.74.5",
     "react-native-quick-sqlite": "^8.1.0",
-    "zustand": "^4.5.2",
     "uuid": "^9.0.1",
-    "axios": "^1.7.2"
+    "zustand": "^4.5.2"
   },
   "devDependencies": {
     "@types/react": "^18.2.79",
