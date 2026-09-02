@@ -12,3 +12,4 @@ describe('Category Service', () => {
     ).rejects.toThrow();
   });
 });
+

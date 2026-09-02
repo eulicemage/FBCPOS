@@ -24,3 +24,4 @@ describe('Inventory Service Validation & Movement Rules', () => {
     ).rejects.toThrow('Counted physical stock cannot be negative');
   });
 });
+

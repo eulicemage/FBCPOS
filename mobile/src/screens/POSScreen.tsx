@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   StyleSheet,
   View,
@@ -7,10 +7,17 @@ import {
   TouchableOpacity,
   ScrollView,
   FlatList,
+  Alert,
 } from 'react-native';
 import { useCartStore } from '../store/cartStore';
 import { useAuthStore } from '../store/authStore';
+import { useHeldCartStore, HeldCart } from '../store/heldCartStore';
 import { Product, DiscountType } from '../../../shared/src';
+import { DiscountModal } from '../components/DiscountModal';
+import { HeldCartsModal } from '../components/HeldCartsModal';
+import { PriceCheckModal } from '../components/PriceCheckModal';
+import { SupervisorPinModal } from '../components/SupervisorPinModal';
+import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
 
 const SAMPLE_CATEGORIES = [
   { id: '1', code: 'ALL', name: 'All Items' },
@@ -99,111 +106,220 @@ const SAMPLE_PRODUCTS: Product[] = [
   },
   {
     id: 'p6',
-    categoryId: '5',
-    sku: 'CAN-002',
-    barcode: '4800046604021',
-    name: 'Premium Jasmine Rice 5kg',
-    costPrice: 220.0,
-    sellingPrice: 280.0,
+    categoryId: '6',
+    sku: 'SNK-001',
+    barcode: '4800056605015',
+    name: 'Potato Crisps Salted 100g',
+    costPrice: 28.0,
+    sellingPrice: 38.0,
     isTaxable: true,
     taxRate: 0.12,
-    unitOfMeasure: 'BAG',
+    unitOfMeasure: 'POUCH',
     isActive: true,
     createdAt: '',
     updatedAt: '',
   },
 ];
 
-export const POSScreen: React.FC = () => {
-  const { currentBranch, currentTerminal, currentUser, isOnline } = useAuthStore();
+interface POSScreenProps {
+  onNavigateToCheckout?: () => void;
+}
+
+export const POSScreen: React.FC<POSScreenProps> = ({ onNavigateToCheckout }) => {
+  const { currentUser, currentBranch, currentTerminal, isOnline } = useAuthStore();
   const {
     items,
+    discountType,
+    discountValue,
+    customerName,
     addItem,
     updateQuantity,
     removeItem,
-    clearCart,
     applyDiscount,
+    applySeniorDiscount,
+    clearCart,
+    loadCart,
     getSubtotal,
     getDiscountAmount,
+    getVatableAmount,
+    getVatExemptAmount,
     getTaxAmount,
     getTotalAmount,
   } = useCartStore();
 
-  const [selectedCategory, setSelectedCategory] = useState('ALL');
+  const { heldCarts, holdCart } = useHeldCartStore();
+
+  // Local state
   const [searchQuery, setSearchQuery] = useState('');
   const [barcodeInput, setBarcodeInput] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
 
-  const handleBarcodeSubmit = () => {
-    if (!barcodeInput.trim()) return;
-    const match = SAMPLE_PRODUCTS.find((p) => p.barcode === barcodeInput.trim());
-    if (match) {
-      addItem(match);
+  // Modals
+  const [discountModalVisible, setDiscountModalVisible] = useState(false);
+  const [heldCartsModalVisible, setHeldCartsModalVisible] = useState(false);
+  const [priceCheckModalVisible, setPriceCheckModalVisible] = useState(false);
+  const [supervisorModalVisible, setSupervisorModalVisible] = useState(false);
+  const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
+
+  // Hardware Barcode Scanner Hook
+  const { handleKeyPress } = useBarcodeScanner({
+    onScan: (scannedBarcode) => {
+      handleBarcodeScan(scannedBarcode);
+    },
+    enabled: !discountModalVisible && !heldCartsModalVisible && !priceCheckModalVisible,
+  });
+
+  const handleBarcodeScan = (code: string) => {
+    const found = SAMPLE_PRODUCTS.find((p) => p.barcode === code.trim());
+    if (found) {
+      addItem(found);
       setBarcodeInput('');
     } else {
-      alert(`Barcode ${barcodeInput} not found in catalog!`);
+      Alert.alert('Barcode Not Found', `No registered item matching barcode ${code}`);
     }
   };
 
-  const filteredProducts = SAMPLE_PRODUCTS.filter((p) => {
+  const handleHoldSale = () => {
+    if (items.length === 0) {
+      Alert.alert('Hold Sale', 'Cart is empty. Nothing to hold.');
+      return;
+    }
+    const held = holdCart(
+      items,
+      getSubtotal(),
+      discountType,
+      discountValue,
+      customerName
+    );
+    if (held) {
+      clearCart();
+      Alert.alert('Sale Held', `Transaction ticket ${held.ticketNumber} held successfully.`);
+    }
+  };
+
+  const handleRecallCart = (cart: HeldCart) => {
+    loadCart(
+      cart.items,
+      cart.discountType,
+      cart.discountValue,
+      cart.customerName,
+      cart.customerTinId
+    );
+  };
+
+  const handleItemVoid = (productId: string, productName: string) => {
+    // Requires supervisor approval if cart has more than 3 items or value > 500
+    if (getTotalAmount() > 500) {
+      setPendingAction(() => () => removeItem(productId));
+      setSupervisorModalVisible(true);
+    } else {
+      removeItem(productId);
+    }
+  };
+
+  const handleSupervisorAuthorized = (supervisor: string) => {
+    setSupervisorModalVisible(false);
+    if (pendingAction) {
+      pendingAction();
+      setPendingAction(null);
+    }
+  };
+
+  const filteredProducts = SAMPLE_PRODUCTS.filter((product) => {
     const matchesCategory =
       selectedCategory === 'ALL' ||
-      (selectedCategory === 'BEV' && p.categoryId === '2') ||
-      (selectedCategory === 'BAK' && p.categoryId === '3') ||
-      (selectedCategory === 'DAI' && p.categoryId === '4') ||
-      (selectedCategory === 'CAN' && p.categoryId === '5');
-
+      SAMPLE_CATEGORIES.find((c) => c.code === selectedCategory)?.id === product.categoryId;
     const matchesSearch =
-      p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.barcode.includes(searchQuery) ||
-      p.sku.toLowerCase().includes(searchQuery.toLowerCase());
-
+      product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      product.barcode.includes(searchQuery) ||
+      product.sku.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesCategory && matchesSearch;
   });
 
   return (
     <View style={styles.container}>
-      {/* Top Header Bar */}
+      {/* Top Tablet Header Bar */}
       <View style={styles.header}>
-        <View>
-          <Text style={styles.brandTitle}>FoodBaskets Corp POS</Text>
-          <Text style={styles.branchSub}>
-            {currentBranch?.name} | {currentTerminal?.name}
+        <View style={styles.headerLeft}>
+          <Text style={styles.brandTitle}>FoodBaskets POS</Text>
+          <Text style={styles.terminalBadge}>
+            {currentBranch?.code} • {currentTerminal?.name}
           </Text>
-        </View>
-        <View style={styles.headerRight}>
-          <View style={[styles.badge, isOnline ? styles.badgeOnline : styles.badgeOffline]}>
-            <Text style={styles.badgeText}>{isOnline ? '● ONLINE (Synced)' : '○ OFFLINE MODE'}</Text>
+          <View style={[styles.statusBadge, isOnline ? styles.badgeOnline : styles.badgeOffline]}>
+            <Text style={styles.statusText}>{isOnline ? 'ONLINE' : 'OFFLINE'}</Text>
           </View>
-          <Text style={styles.cashierName}>Cashier: {currentUser?.fullName}</Text>
+        </View>
+
+        <View style={styles.headerRight}>
+          <TouchableOpacity
+            style={styles.headerActionBtn}
+            onPress={() => setPriceCheckModalVisible(true)}
+          >
+            <Text style={styles.headerActionText}>🔍 Price Check (F6)</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.headerActionBtn}
+            onPress={() => setHeldCartsModalVisible(true)}
+          >
+            <Text style={styles.headerActionText}>
+              ⏳ Recall ({heldCarts.length}) (F5)
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.headerActionBtn, styles.holdBtn]}
+            onPress={handleHoldSale}
+          >
+            <Text style={styles.holdBtnText}>⏸ Hold Sale (F4)</Text>
+          </TouchableOpacity>
+
+          <View style={styles.cashierInfo}>
+            <Text style={styles.cashierName}>{currentUser?.fullName}</Text>
+            <Text style={styles.cashierRole}>{currentUser?.role}</Text>
+          </View>
         </View>
       </View>
 
-      {/* Main Split-Screen Layout */}
-      <View style={styles.mainContent}>
-        {/* Left 60%: Catalog & Search Grid */}
+      {/* Main Workspace Split Layout */}
+      <View style={styles.mainWorkspace}>
+        {/* Left 62%: Catalog, Barcode Scanner, and Categories */}
         <View style={styles.catalogSection}>
           {/* Barcode & Search Controls */}
-          <View style={styles.searchBarContainer}>
-            <TextInput
-              style={styles.barcodeInput}
-              placeholder="Scan or Enter Barcode..."
-              placeholderTextColor="#94A3B8"
-              value={barcodeInput}
-              onChangeText={setBarcodeInput}
-              onSubmitEditing={handleBarcodeSubmit}
-              autoCapitalize="none"
-            />
+          <View style={styles.searchContainer}>
+            <View style={styles.barcodeBox}>
+              <TextInput
+                style={styles.barcodeInput}
+                placeholder="Scan / Type Barcode..."
+                placeholderTextColor="#64748B"
+                value={barcodeInput}
+                onChangeText={setBarcodeInput}
+                onSubmitEditing={() => handleBarcodeScan(barcodeInput)}
+                keyboardType="numeric"
+              />
+              <TouchableOpacity
+                style={styles.addBarcodeBtn}
+                onPress={() => handleBarcodeScan(barcodeInput)}
+              >
+                <Text style={styles.addBarcodeBtnText}>Add</Text>
+              </TouchableOpacity>
+            </View>
+
             <TextInput
               style={styles.searchInput}
-              placeholder="🔍 Search product name, SKU..."
-              placeholderTextColor="#94A3B8"
+              placeholder="🔍 Search item name, SKU..."
+              placeholderTextColor="#64748B"
               value={searchQuery}
               onChangeText={setSearchQuery}
             />
           </View>
 
-          {/* Category Navigation Ribbon */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryRibbon}>
+          {/* Category Ribbon */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.categoryRibbon}
+          >
             {SAMPLE_CATEGORIES.map((cat) => (
               <TouchableOpacity
                 key={cat.id}
@@ -225,7 +341,7 @@ export const POSScreen: React.FC = () => {
             ))}
           </ScrollView>
 
-          {/* Product Grid */}
+          {/* Product Cards Grid */}
           <FlatList
             data={filteredProducts}
             numColumns={3}
@@ -246,31 +362,41 @@ export const POSScreen: React.FC = () => {
           />
         </View>
 
-        {/* Right 40%: Active Cart & Quick Pay */}
+        {/* Right 38%: Active Cart, Calculations & Tender Actions */}
         <View style={styles.cartSection}>
           <View style={styles.cartHeader}>
-            <Text style={styles.cartTitle}>Active Cart ({items.length} items)</Text>
+            <View>
+              <Text style={styles.cartTitle}>Active Ticket ({items.length} items)</Text>
+              {customerName ? (
+                <Text style={styles.customerBadge}>Customer: {customerName}</Text>
+              ) : null}
+            </View>
             <TouchableOpacity onPress={clearCart} disabled={items.length === 0}>
               <Text style={[styles.clearCartBtn, items.length === 0 && styles.disabledText]}>
-                Clear
+                Clear Cart
               </Text>
             </TouchableOpacity>
           </View>
 
-          {/* Cart Items List */}
+          {/* Cart Item Rows */}
           <ScrollView style={styles.cartList}>
             {items.length === 0 ? (
               <View style={styles.emptyCartContainer}>
                 <Text style={styles.emptyCartText}>Cart is empty</Text>
-                <Text style={styles.emptyCartSub}>Scan a barcode or tap an item to begin</Text>
+                <Text style={styles.emptyCartSub}>
+                  Scan a barcode or tap an item on the left to start sale
+                </Text>
               </View>
             ) : (
               items.map((item) => (
                 <View key={item.productId} style={styles.cartItemRow}>
                   <View style={styles.cartItemInfo}>
                     <Text style={styles.cartItemName}>{item.name}</Text>
-                    <Text style={styles.cartItemUnitPrice}>₱{item.unitPrice.toFixed(2)}</Text>
+                    <Text style={styles.cartItemUnitPrice}>
+                      ₱{item.unitPrice.toFixed(2)} × {item.quantity}
+                    </Text>
                   </View>
+
                   <View style={styles.qtyControls}>
                     <TouchableOpacity
                       style={styles.qtyBtn}
@@ -286,44 +412,130 @@ export const POSScreen: React.FC = () => {
                       <Text style={styles.qtyBtnText}>+</Text>
                     </TouchableOpacity>
                   </View>
+
                   <Text style={styles.cartItemTotal}>₱{item.total.toFixed(2)}</Text>
+
+                  <TouchableOpacity
+                    style={styles.deleteBtn}
+                    onPress={() => handleItemVoid(item.productId, item.name)}
+                  >
+                    <Text style={styles.deleteBtnText}>✕</Text>
+                  </TouchableOpacity>
                 </View>
               ))
             )}
           </ScrollView>
 
-          {/* Cart Summary Totals */}
+          {/* Financial Breakdown & Tax Summary */}
           <View style={styles.cartSummary}>
             <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Subtotal</Text>
+              <Text style={styles.summaryLabel}>Gross Subtotal</Text>
               <Text style={styles.summaryValue}>₱{getSubtotal().toFixed(2)}</Text>
             </View>
+
             <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Discount</Text>
-              <Text style={styles.summaryValue}>-₱{getDiscountAmount().toFixed(2)}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text style={styles.summaryLabel}>Discount</Text>
+                {discountType !== DiscountType.NONE ? (
+                  <View style={styles.discountBadge}>
+                    <Text style={styles.discountBadgeText}>
+                      {discountType === DiscountType.SENIOR_PWD ? 'SENIOR/PWD 20%' : `${discountValue}%`}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+              <Text style={[styles.summaryValue, styles.textDiscount]}>
+                -₱{getDiscountAmount().toFixed(2)}
+              </Text>
             </View>
+
             <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>12% VAT (Included)</Text>
-              <Text style={styles.summaryValue}>₱{getTaxAmount().toFixed(2)}</Text>
+              <Text style={styles.summaryLabelSub}>VATable Sales</Text>
+              <Text style={styles.summaryValueSub}>₱{getVatableAmount().toFixed(2)}</Text>
             </View>
+
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabelSub}>VAT-Exempt Sales</Text>
+              <Text style={styles.summaryValueSub}>₱{getVatExemptAmount().toFixed(2)}</Text>
+            </View>
+
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabelSub}>12% VAT Amount</Text>
+              <Text style={styles.summaryValueSub}>₱{getTaxAmount().toFixed(2)}</Text>
+            </View>
+
             <View style={[styles.summaryRow, styles.totalRow]}>
-              <Text style={styles.totalLabel}>TOTAL DUE</Text>
+              <Text style={styles.totalLabel}>TOTAL AMOUNT DUE</Text>
               <Text style={styles.totalValue}>₱{getTotalAmount().toFixed(2)}</Text>
             </View>
           </View>
 
-          {/* Quick Pay Action Buttons */}
+          {/* Action Row */}
           <View style={styles.cartActions}>
             <TouchableOpacity
-              style={[styles.payCashBtn, items.length === 0 && styles.disabledBtn]}
+              style={styles.discountActionBtn}
+              onPress={() => setDiscountModalVisible(true)}
               disabled={items.length === 0}
-              onPress={() => alert(`Processing Cash Payment of ₱${getTotalAmount().toFixed(2)}`)}
             >
-              <Text style={styles.payCashBtnText}>PAY CASH (F12)</Text>
+              <Text style={styles.discountActionText}>% Discount (F3)</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.checkoutBtn, items.length === 0 && styles.disabledBtn]}
+              disabled={items.length === 0}
+              onPress={() => {
+                if (onNavigateToCheckout) {
+                  onNavigateToCheckout();
+                } else {
+                  Alert.alert(
+                    'Order Ready for Tender',
+                    `Total: ₱${getTotalAmount().toFixed(2)}\nProceeding to payment terminal...`
+                  );
+                }
+              }}
+            >
+              <Text style={styles.checkoutBtnText}>PROCEED TO CHECKOUT (F12)</Text>
             </TouchableOpacity>
           </View>
         </View>
       </View>
+
+      {/* Modals */}
+      <DiscountModal
+        visible={discountModalVisible}
+        onClose={() => setDiscountModalVisible(false)}
+        onApplyDiscount={(type, value, seniorId, custName) => {
+          if (type === DiscountType.SENIOR_PWD && seniorId && custName) {
+            applySeniorDiscount(seniorId, custName);
+          } else {
+            applyDiscount(type, value);
+          }
+        }}
+      />
+
+      <HeldCartsModal
+        visible={heldCartsModalVisible}
+        onClose={() => setHeldCartsModalVisible(false)}
+        onRecallCart={handleRecallCart}
+      />
+
+      <PriceCheckModal
+        visible={priceCheckModalVisible}
+        products={SAMPLE_PRODUCTS}
+        onClose={() => setPriceCheckModalVisible(false)}
+        onAddToCart={(product) => addItem(product)}
+      />
+
+      <SupervisorPinModal
+        visible={supervisorModalVisible}
+        actionTitle="Item Void Approval"
+        reason="Transaction total exceeds ₱500 threshold"
+        onAuthorize={handleSupervisorAuthorized}
+        onCancel={() => {
+          setSupervisorModalVisible(false);
+          setPendingAction(null);
+        }}
+      />
     </View>
   );
 };
@@ -339,28 +551,29 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#334155',
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
   },
   brandTitle: {
     color: '#38BDF8',
     fontSize: 18,
     fontWeight: 'bold',
   },
-  branchSub: {
+  terminalBadge: {
     color: '#94A3B8',
     fontSize: 12,
+    fontWeight: '600',
   },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 15,
-  },
-  badge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
   },
   badgeOnline: {
     backgroundColor: '#065F46',
@@ -368,71 +581,125 @@ const styles = StyleSheet.create({
   badgeOffline: {
     backgroundColor: '#991B1B',
   },
-  badgeText: {
+  statusText: {
     color: '#FFFFFF',
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: 'bold',
   },
-  cashierName: {
-    color: '#F1F5F9',
-    fontSize: 14,
-    fontWeight: '500',
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
-  mainContent: {
+  headerActionBtn: {
+    backgroundColor: '#0F172A',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  headerActionText: {
+    color: '#CBD5E1',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  holdBtn: {
+    borderColor: '#F59E0B',
+  },
+  holdBtnText: {
+    color: '#F59E0B',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  cashierInfo: {
+    alignItems: 'flex-end',
+    marginLeft: 8,
+  },
+  cashierName: {
+    color: '#F8FAFC',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  cashierRole: {
+    color: '#64748B',
+    fontSize: 11,
+  },
+  mainWorkspace: {
     flex: 1,
     flexDirection: 'row',
   },
   catalogSection: {
-    flex: 0.62,
+    flex: 62,
     borderRightWidth: 1,
     borderRightColor: '#334155',
     padding: 12,
   },
-  searchBarContainer: {
+  searchContainer: {
     flexDirection: 'row',
     gap: 10,
     marginBottom: 10,
   },
+  barcodeBox: {
+    flex: 1.2,
+    flexDirection: 'row',
+    backgroundColor: '#1E293B',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#0284C7',
+    overflow: 'hidden',
+  },
   barcodeInput: {
     flex: 1,
-    height: 48,
-    backgroundColor: '#1E293B',
-    borderRadius: 8,
+    height: 42,
     paddingHorizontal: 12,
     color: '#FFFFFF',
-    fontSize: 15,
-    borderWidth: 1,
-    borderColor: '#38BDF8',
+    fontSize: 14,
+  },
+  addBarcodeBtn: {
+    backgroundColor: '#0284C7',
+    paddingHorizontal: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  addBarcodeBtnText: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    fontSize: 13,
   },
   searchInput: {
-    flex: 1.5,
-    height: 48,
+    flex: 1,
+    height: 42,
     backgroundColor: '#1E293B',
     borderRadius: 8,
     paddingHorizontal: 12,
     color: '#FFFFFF',
-    fontSize: 15,
     borderWidth: 1,
     borderColor: '#334155',
+    fontSize: 14,
   },
   categoryRibbon: {
-    maxHeight: 45,
+    maxHeight: 44,
     marginBottom: 10,
   },
   categoryTab: {
     paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
+    paddingVertical: 8,
     backgroundColor: '#1E293B',
+    borderRadius: 20,
     marginRight: 8,
+    borderWidth: 1,
+    borderColor: '#334155',
+    justifyContent: 'center',
   },
   categoryTabActive: {
     backgroundColor: '#0284C7',
+    borderColor: '#38BDF8',
   },
   categoryTabText: {
     color: '#94A3B8',
+    fontSize: 13,
     fontWeight: '600',
-    fontSize: 14,
   },
   categoryTabTextActive: {
     color: '#FFFFFF',
@@ -443,17 +710,17 @@ const styles = StyleSheet.create({
   productCard: {
     flex: 1 / 3,
     backgroundColor: '#1E293B',
-    margin: 5,
-    padding: 14,
+    margin: 4,
+    padding: 12,
     borderRadius: 10,
-    minHeight: 110,
-    justifyContent: 'space-between',
     borderWidth: 1,
     borderColor: '#334155',
+    height: 110,
+    justifyContent: 'space-between',
   },
   productName: {
     color: '#F8FAFC',
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: 'bold',
   },
   productSku: {
@@ -475,39 +742,45 @@ const styles = StyleSheet.create({
     fontSize: 11,
   },
   cartSection: {
-    flex: 0.38,
-    backgroundColor: '#1E293B',
+    flex: 38,
+    backgroundColor: '#0F172A',
+    display: 'flex',
     flexDirection: 'column',
   },
   cartHeader: {
+    padding: 12,
+    backgroundColor: '#1E293B',
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#334155',
   },
   cartTitle: {
     color: '#F8FAFC',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: 'bold',
+  },
+  customerBadge: {
+    color: '#38BDF8',
+    fontSize: 11,
+    fontWeight: '600',
   },
   clearCartBtn: {
     color: '#EF4444',
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
   },
   disabledText: {
-    color: '#64748B',
+    color: '#475569',
   },
   cartList: {
     flex: 1,
-    padding: 10,
+    padding: 8,
   },
   emptyCartContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
     paddingVertical: 60,
+    alignItems: 'center',
   },
   emptyCartText: {
     color: '#64748B',
@@ -518,108 +791,164 @@ const styles = StyleSheet.create({
     color: '#475569',
     fontSize: 12,
     marginTop: 4,
+    textAlign: 'center',
+    paddingHorizontal: 20,
   },
   cartItemRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#0F172A',
+    backgroundColor: '#1E293B',
     padding: 10,
     borderRadius: 8,
-    marginBottom: 8,
+    marginBottom: 6,
+    borderWidth: 1,
+    borderColor: '#334155',
   },
   cartItemInfo: {
     flex: 1,
   },
   cartItemName: {
-    color: '#FFFFFF',
+    color: '#F8FAFC',
     fontSize: 13,
     fontWeight: '600',
   },
   cartItemUnitPrice: {
     color: '#94A3B8',
     fontSize: 11,
+    marginTop: 2,
   },
   qtyControls: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginHorizontal: 10,
+    backgroundColor: '#0F172A',
+    borderRadius: 6,
+    paddingHorizontal: 4,
+    marginHorizontal: 8,
   },
   qtyBtn: {
-    width: 28,
-    height: 28,
-    backgroundColor: '#334155',
-    borderRadius: 4,
-    alignItems: 'center',
-    justifyContent: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
   },
   qtyBtnText: {
-    color: '#FFFFFF',
+    color: '#38BDF8',
     fontSize: 16,
     fontWeight: 'bold',
   },
   qtyText: {
     color: '#FFFFFF',
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: 'bold',
+    minWidth: 20,
+    textAlign: 'center',
   },
   cartItemTotal: {
-    color: '#38BDF8',
+    color: '#FFFFFF',
     fontSize: 14,
     fontWeight: 'bold',
-    width: 65,
+    minWidth: 65,
     textAlign: 'right',
   },
+  deleteBtn: {
+    marginLeft: 8,
+    padding: 4,
+  },
+  deleteBtnText: {
+    color: '#EF4444',
+    fontSize: 13,
+    fontWeight: 'bold',
+  },
   cartSummary: {
-    padding: 16,
+    backgroundColor: '#1E293B',
+    padding: 12,
     borderTopWidth: 1,
     borderTopColor: '#334155',
-    backgroundColor: '#0F172A',
   },
   summaryRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 6,
+    marginBottom: 4,
   },
   summaryLabel: {
     color: '#94A3B8',
-    fontSize: 13,
+    fontSize: 12,
   },
   summaryValue: {
     color: '#F8FAFC',
-    fontSize: 13,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  summaryLabelSub: {
+    color: '#64748B',
+    fontSize: 11,
+  },
+  summaryValueSub: {
+    color: '#94A3B8',
+    fontSize: 11,
+  },
+  textDiscount: {
+    color: '#10B981',
+  },
+  discountBadge: {
+    backgroundColor: '#065F46',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 4,
+  },
+  discountBadgeText: {
+    color: '#6EE7B7',
+    fontSize: 9,
+    fontWeight: 'bold',
   },
   totalRow: {
-    marginTop: 6,
-    paddingTop: 8,
     borderTopWidth: 1,
     borderTopColor: '#334155',
+    marginTop: 6,
+    paddingTop: 6,
+    alignItems: 'center',
   },
   totalLabel: {
-    color: '#F8FAFC',
-    fontSize: 18,
+    color: '#38BDF8',
+    fontSize: 14,
     fontWeight: 'bold',
   },
   totalValue: {
     color: '#38BDF8',
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: 'bold',
   },
   cartActions: {
-    padding: 16,
+    flexDirection: 'row',
+    padding: 10,
     backgroundColor: '#0F172A',
+    gap: 8,
   },
-  payCashBtn: {
+  discountActionBtn: {
+    flex: 1,
+    height: 48,
+    backgroundColor: '#1E293B',
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  discountActionText: {
+    color: '#CBD5E1',
+    fontWeight: 'bold',
+    fontSize: 12,
+  },
+  checkoutBtn: {
+    flex: 2,
+    height: 48,
     backgroundColor: '#10B981',
-    height: 54,
-    borderRadius: 10,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  payCashBtnText: {
+  checkoutBtnText: {
     color: '#FFFFFF',
-    fontSize: 18,
     fontWeight: 'bold',
+    fontSize: 13,
   },
   disabledBtn: {
     backgroundColor: '#334155',

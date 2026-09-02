@@ -8,6 +8,7 @@ interface CartState {
   discountValue: number;
   customerName?: string;
   customerTinId?: string;
+  seniorIdNumber?: string;
   notes?: string;
 
   // Actions
@@ -15,11 +16,16 @@ interface CartState {
   updateQuantity: (productId: string, quantity: number) => void;
   removeItem: (productId: string) => void;
   applyDiscount: (type: DiscountType, value: number) => void;
+  applySeniorDiscount: (seniorId: string, customerName: string) => void;
+  setCustomerInfo: (name?: string, tinId?: string, notes?: string) => void;
+  loadCart: (items: CartItem[], discountType: DiscountType, discountValue: number, customerName?: string, customerTinId?: string) => void;
   clearCart: () => void;
 
-  // Computed Totals
+  // Computed Totals & Tax Breakdown
   getSubtotal: () => number;
   getDiscountAmount: () => number;
+  getVatableAmount: () => number;
+  getVatExemptAmount: () => number;
   getTaxAmount: () => number;
   getTotalAmount: () => number;
 }
@@ -28,6 +34,10 @@ export const useCartStore = create<CartState>((set, get) => ({
   items: [],
   discountType: DiscountType.NONE,
   discountValue: 0,
+  customerName: undefined,
+  customerTinId: undefined,
+  seniorIdNumber: undefined,
+  notes: undefined,
 
   addItem: (product: Product, quantity = 1) => {
     set((state) => {
@@ -157,6 +167,32 @@ export const useCartStore = create<CartState>((set, get) => ({
     });
   },
 
+  applySeniorDiscount: (seniorId: string, customerName: string) => {
+    get().applyDiscount(DiscountType.SENIOR_PWD, 20);
+    set({
+      seniorIdNumber: seniorId,
+      customerName,
+    });
+  },
+
+  setCustomerInfo: (name?: string, tinId?: string, notes?: string) => {
+    set({
+      customerName: name,
+      customerTinId: tinId,
+      notes,
+    });
+  },
+
+  loadCart: (items: CartItem[], discountType: DiscountType, discountValue: number, customerName?: string, customerTinId?: string) => {
+    set({
+      items,
+      discountType,
+      discountValue,
+      customerName,
+      customerTinId,
+    });
+  },
+
   clearCart: () => {
     set({
       items: [],
@@ -164,6 +200,7 @@ export const useCartStore = create<CartState>((set, get) => ({
       discountValue: 0,
       customerName: undefined,
       customerTinId: undefined,
+      seniorIdNumber: undefined,
       notes: undefined,
     });
   },
@@ -176,8 +213,27 @@ export const useCartStore = create<CartState>((set, get) => ({
     return roundTo2Decimals(get().items.reduce((sum, item) => sum + item.discountAmount, 0));
   },
 
+  getVatableAmount: () => {
+    const isSenior = get().discountType === DiscountType.SENIOR_PWD;
+    if (isSenior) return 0;
+    const subtotalNet = get().getSubtotal() - get().getDiscountAmount();
+    return roundTo2Decimals(subtotalNet / 1.12);
+  },
+
+  getVatExemptAmount: () => {
+    const isSenior = get().discountType === DiscountType.SENIOR_PWD;
+    if (isSenior) {
+      return roundTo2Decimals(get().getSubtotal() / 1.12);
+    }
+    return 0;
+  },
+
   getTaxAmount: () => {
-    return roundTo2Decimals(get().items.reduce((sum, item) => sum + item.taxAmount, 0));
+    const isSenior = get().discountType === DiscountType.SENIOR_PWD;
+    if (isSenior) return 0;
+    const net = get().getSubtotal() - get().getDiscountAmount();
+    const vatable = roundTo2Decimals(net / 1.12);
+    return roundTo2Decimals(net - vatable);
   },
 
   getTotalAmount: () => {
