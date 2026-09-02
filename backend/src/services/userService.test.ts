@@ -23,3 +23,4 @@ describe('User Service & RBAC Logic', () => {
     ).rejects.toThrow('Branch Managers can only create Cashier accounts');
   });
 });
+

@@ -58,3 +58,4 @@ excelRouter.get(
   authorize(['ADMIN', 'MANAGER', 'AUDITOR']),
   ExcelController.exportInventory
 );
+

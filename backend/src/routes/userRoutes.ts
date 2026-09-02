@@ -24,3 +24,4 @@ userRouter.post('/:id/change-pin', UserController.changePin);
 
 // Supervisor PIN verification for POS terminal overrides
 userRouter.post('/supervisor/verify-pin', UserController.verifySupervisorOverride);
+

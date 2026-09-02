@@ -68,4 +68,109 @@ export class CatalogService {
       include: { category: true },
     });
   }
+
+  static async getProductById(id: string) {
+    const product = await prisma.product.findUnique({
+      where: { id },
+      include: {
+        category: true,
+        branchInventory: {
+          include: { branch: true },
+        },
+      },
+    });
+    if (!product) {
+      throw new Error('Product not found');
+    }
+    return product;
+  }
+
+  static async createProduct(data: {
+    sku: string;
+    barcode: string;
+    name: string;
+    categoryId: string;
+    costPrice: number;
+    sellingPrice: number;
+    description?: string;
+    isTaxable?: boolean;
+    taxRate?: number;
+    unitOfMeasure?: string;
+  }) {
+    const existingBarcode = await prisma.product.findUnique({
+      where: { barcode: data.barcode },
+    });
+    if (existingBarcode) {
+      throw new Error(`Product with barcode '${data.barcode}' already exists`);
+    }
+
+    const existingSku = await prisma.product.findUnique({
+      where: { sku: data.sku },
+    });
+    if (existingSku) {
+      throw new Error(`Product with SKU '${data.sku}' already exists`);
+    }
+
+    return await prisma.product.create({
+      data: {
+        categoryId: data.categoryId,
+        sku: data.sku,
+        barcode: data.barcode,
+        name: data.name,
+        description: data.description,
+        costPrice: data.costPrice,
+        sellingPrice: data.sellingPrice,
+        isTaxable: data.isTaxable !== false,
+        taxRate: data.taxRate ?? 0.12,
+        unitOfMeasure: data.unitOfMeasure || 'PCS',
+        isActive: true,
+      },
+      include: { category: true },
+    });
+  }
+
+  static async updateProduct(
+    id: string,
+    data: {
+      categoryId?: string;
+      sku?: string;
+      barcode?: string;
+      name?: string;
+      description?: string;
+      costPrice?: number;
+      sellingPrice?: number;
+      isTaxable?: boolean;
+      taxRate?: number;
+      unitOfMeasure?: string;
+      isActive?: boolean;
+    }
+  ) {
+    const existing = await prisma.product.findUnique({ where: { id } });
+    if (!existing) {
+      throw new Error('Product not found');
+    }
+
+    if (data.barcode && data.barcode !== existing.barcode) {
+      const barcodeCheck = await prisma.product.findUnique({ where: { barcode: data.barcode } });
+      if (barcodeCheck) throw new Error(`Barcode '${data.barcode}' is already in use`);
+    }
+
+    if (data.sku && data.sku !== existing.sku) {
+      const skuCheck = await prisma.product.findUnique({ where: { sku: data.sku } });
+      if (skuCheck) throw new Error(`SKU '${data.sku}' is already in use`);
+    }
+
+    return await prisma.product.update({
+      where: { id },
+      data,
+      include: { category: true },
+    });
+  }
+
+  static async deactivateProduct(id: string) {
+    return await prisma.product.update({
+      where: { id },
+      data: { isActive: false },
+    });
+  }
 }
