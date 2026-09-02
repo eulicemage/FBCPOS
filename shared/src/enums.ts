@@ -1,0 +1,50 @@
+export enum UserRole {
+  ADMIN = 'ADMIN',
+  MANAGER = 'MANAGER',
+  CASHIER = 'CASHIER',
+  AUDITOR = 'AUDITOR',
+}
+
+export enum MovementType {
+  STOCK_IN = 'STOCK_IN',
+  SALE = 'SALE',
+  RETURN_RESTOCK = 'RETURN_RESTOCK',
+  RETURN_DAMAGE = 'RETURN_DAMAGE',
+  ADJUSTMENT_DAMAGE = 'ADJUSTMENT_DAMAGE',
+  ADJUSTMENT_AUDIT = 'ADJUSTMENT_AUDIT',
+  TRANSFER_OUT = 'TRANSFER_OUT',
+  TRANSFER_IN = 'TRANSFER_IN',
+}
+
+export enum PaymentMethod {
+  CASH = 'CASH',
+  CARD = 'CARD',
+  EWALLET_GCASH = 'EWALLET_GCASH',
+  EWALLET_MAYA = 'EWALLET_MAYA',
+  OTHER = 'OTHER',
+}
+
+export enum DiscountType {
+  NONE = 'NONE',
+  PERCENTAGE = 'PERCENTAGE',
+  FIXED = 'FIXED',
+  SENIOR_PWD = 'SENIOR_PWD',
+}
+
+export enum SyncStatus {
+  PENDING = 'PENDING',
+  SYNCING = 'SYNCING',
+  SYNCED = 'SYNCED',
+  FAILED = 'FAILED',
+}
+
+export enum ShiftStatus {
+  OPEN = 'OPEN',
+  CLOSED = 'CLOSED',
+}
+
+export enum SaleStatus {
+  COMPLETED = 'COMPLETED',
+  CANCELLED = 'CANCELLED',
+  REFUNDED = 'REFUNDED',
+}

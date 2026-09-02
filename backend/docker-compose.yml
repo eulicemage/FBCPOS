@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: fbcpos_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: fbcpos_user
+      POSTGRES_PASSWORD: fbcpos_secret
+      POSTGRES_DB: fbcpos_db
+    ports:
+      - '5432:5432'
+    volumes:
+      - fbcpos_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fbcpos_user -d fbcpos_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  fbcpos_pgdata:

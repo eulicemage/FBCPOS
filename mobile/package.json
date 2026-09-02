@@ -1,0 +1,25 @@
+{
+  "name": "@fbcpos/mobile",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "react-native start",
+    "android": "react-native run-android",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "react": "18.2.0",
+    "react-native": "0.74.1",
+    "react-native-quick-sqlite": "^8.1.0",
+    "zustand": "^4.5.2",
+    "uuid": "^9.0.1",
+    "axios": "^1.7.2"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.79",
+    "@types/react-native": "^0.73.0",
+    "@types/uuid": "^9.0.8",
+    "typescript": "^5.4.5",
+    "vitest": "^1.6.0"
+  }
+}

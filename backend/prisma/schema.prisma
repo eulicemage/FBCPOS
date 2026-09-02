@@ -1,0 +1,338 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  CASHIER
+  AUDITOR
+}
+
+enum MovementType {
+  STOCK_IN
+  SALE
+  RETURN_RESTOCK
+  RETURN_DAMAGE
+  ADJUSTMENT_DAMAGE
+  ADJUSTMENT_AUDIT
+  TRANSFER_OUT
+  TRANSFER_IN
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  EWALLET_GCASH
+  EWALLET_MAYA
+  OTHER
+}
+
+enum DiscountType {
+  NONE
+  PERCENTAGE
+  FIXED
+  SENIOR_PWD
+}
+
+enum ShiftStatus {
+  OPEN
+  CLOSED
+}
+
+enum SaleStatus {
+  COMPLETED
+  CANCELLED
+  REFUNDED
+}
+
+enum SyncStatus {
+  PENDING
+  SYNCING
+  SYNCED
+  FAILED
+}
+
+model Branch {
+  id              String            @id @default(uuid())
+  code            String            @unique
+  name            String
+  address         String
+  phone           String?
+  taxId           String
+  isActive        Boolean           @default(true)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  terminals       Terminal[]
+  users           User[]
+  branchInventory BranchInventory[]
+  shifts          Shift[]
+  sales           Sale[]
+  stockMovements  StockMovement[]
+  returns         Return[]
+
+  @@map("branches")
+}
+
+model Terminal {
+  id             String          @id @default(uuid())
+  branchId       String
+  terminalNumber String
+  deviceUid      String          @unique
+  name           String
+  apiSecretHash  String?
+  isActive       Boolean         @default(true)
+  lastSyncAt     DateTime?
+  createdAt      DateTime        @default(now())
+  branch         Branch          @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  shifts         Shift[]
+  sales          Sale[]
+  stockMovements StockMovement[]
+  returns        Return[]
+
+  @@unique([branchId, terminalNumber])
+  @@map("terminals")
+}
+
+model User {
+  id             String          @id @default(uuid())
+  branchId       String?
+  username       String          @unique
+  passwordHash   String
+  pinHash        String
+  fullName       String
+  role           UserRole        @default(CASHIER)
+  isActive       Boolean         @default(true)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  branch         Branch?         @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  shifts         Shift[]
+  sales          Sale[]
+  stockMovements StockMovement[]
+  returns        Return[]
+  auditLogs      AuditLog[]
+
+  @@map("users")
+}
+
+model Category {
+  id        String    @id @default(uuid())
+  name      String
+  code      String    @unique
+  colorHex  String    @default("#3B82F6")
+  sortOrder Int       @default(0)
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  products  Product[]
+
+  @@map("categories")
+}
+
+model Product {
+  id              String            @id @default(uuid())
+  categoryId      String
+  sku             String            @unique
+  barcode         String            @unique
+  name            String
+  description     String?
+  costPrice       Decimal           @default(0.00) @db.Decimal(12, 2)
+  sellingPrice    Decimal           @default(0.00) @db.Decimal(12, 2)
+  isTaxable       Boolean           @default(true)
+  taxRate         Decimal           @default(0.1200) @db.Decimal(5, 4)
+  unitOfMeasure   String            @default("PCS")
+  isActive        Boolean           @default(true)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  category        Category          @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  branchInventory BranchInventory[]
+  saleItems       SaleItem[]
+  stockMovements  StockMovement[]
+  returnItems     ReturnItem[]
+
+  @@index([barcode])
+  @@index([sku])
+  @@index([updatedAt])
+  @@map("products")
+}
+
+model BranchInventory {
+  id            String   @id @default(uuid())
+  branchId      String
+  productId     String
+  stockQuantity Decimal  @default(0.000) @db.Decimal(12, 3)
+  reorderLevel  Decimal  @default(10.000) @db.Decimal(12, 3)
+  updatedAt     DateTime @updatedAt
+  branch        Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([branchId, productId])
+  @@map("branch_inventory")
+}
+
+model Shift {
+  id             String      @id @default(uuid())
+  branchId       String
+  terminalId     String
+  userId         String
+  shiftNumber    String
+  openedAt       DateTime    @default(now())
+  closedAt       DateTime?
+  openingCash    Decimal     @db.Decimal(12, 2)
+  expectedCash   Decimal?    @db.Decimal(12, 2)
+  actualCash     Decimal?    @db.Decimal(12, 2)
+  cashDifference Decimal?    @db.Decimal(12, 2)
+  notes          String?
+  status         ShiftStatus @default(OPEN)
+  createdAt      DateTime    @default(now())
+  branch         Branch      @relation(fields: [branchId], references: [id])
+  terminal       Terminal    @relation(fields: [terminalId], references: [id])
+  user           User        @relation(fields: [userId], references: [id])
+  sales          Sale[]
+  returns        Return[]
+
+  @@map("shifts")
+}
+
+model Sale {
+  id             String       @id
+  branchId       String
+  terminalId     String
+  cashierId      String
+  shiftId        String
+  invoiceNumber  String       @unique
+  subtotalAmount Decimal      @db.Decimal(12, 2)
+  discountType   DiscountType @default(NONE)
+  discountValue  Decimal      @default(0.00) @db.Decimal(12, 2)
+  discountAmount Decimal      @default(0.00) @db.Decimal(12, 2)
+  taxAmount      Decimal      @db.Decimal(12, 2)
+  totalAmount    Decimal      @db.Decimal(12, 2)
+  status         SaleStatus   @default(COMPLETED)
+  customerName   String?
+  customerTinId  String?
+  notes          String?
+  createdAt      DateTime
+  syncedAt       DateTime     @default(now())
+  branch         Branch       @relation(fields: [branchId], references: [id])
+  terminal       Terminal     @relation(fields: [terminalId], references: [id])
+  cashier        User         @relation(fields: [cashierId], references: [id])
+  shift          Shift        @relation(fields: [shiftId], references: [id])
+  items          SaleItem[]
+  payments       Payment[]
+  returns        Return[]
+
+  @@index([branchId, createdAt])
+  @@index([invoiceNumber])
+  @@map("sales")
+}
+
+model SaleItem {
+  id             String       @id @default(uuid())
+  saleId         String
+  productId      String
+  sku            String
+  barcode        String
+  productName    String
+  costPrice      Decimal      @db.Decimal(12, 2)
+  unitPrice      Decimal      @db.Decimal(12, 2)
+  quantity       Decimal      @db.Decimal(12, 3)
+  discountAmount Decimal      @default(0.00) @db.Decimal(12, 2)
+  taxAmount      Decimal      @default(0.00) @db.Decimal(12, 2)
+  totalAmount    Decimal      @db.Decimal(12, 2)
+  sale           Sale         @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  product        Product      @relation(fields: [productId], references: [id])
+  returnItems    ReturnItem[]
+
+  @@map("sale_items")
+}
+
+model Payment {
+  id             String        @id @default(uuid())
+  saleId         String
+  paymentMethod  PaymentMethod
+  amount         Decimal       @db.Decimal(12, 2)
+  amountTendered Decimal       @db.Decimal(12, 2)
+  changeAmount   Decimal       @db.Decimal(12, 2)
+  referenceNumber String?
+  createdAt      DateTime      @default(now())
+  sale           Sale          @relation(fields: [saleId], references: [id], onDelete: Cascade)
+
+  @@map("payments")
+}
+
+model StockMovement {
+  id             String       @id @default(uuid())
+  branchId       String
+  productId      String
+  terminalId     String?
+  userId         String
+  movementType   MovementType
+  quantityChange Decimal      @db.Decimal(12, 3)
+  previousQuantity Decimal    @db.Decimal(12, 3)
+  newQuantity    Decimal      @db.Decimal(12, 3)
+  referenceId    String?
+  reason         String?
+  createdAt      DateTime     @default(now())
+  branch         Branch       @relation(fields: [branchId], references: [id])
+  product        Product      @relation(fields: [productId], references: [id])
+  terminal       Terminal?    @relation(fields: [terminalId], references: [id])
+  user           User         @relation(fields: [userId], references: [id])
+
+  @@index([branchId, productId, createdAt])
+  @@map("stock_movements")
+}
+
+model Return {
+  id             String       @id @default(uuid())
+  originalSaleId String
+  branchId       String
+  terminalId     String
+  cashierId      String
+  shiftId        String
+  returnNumber   String       @unique
+  refundAmount   Decimal      @db.Decimal(12, 2)
+  reason         String
+  createdAt      DateTime     @default(now())
+  originalSale   Sale         @relation(fields: [originalSaleId], references: [id])
+  branch         Branch       @relation(fields: [branchId], references: [id])
+  terminal       Terminal     @relation(fields: [terminalId], references: [id])
+  cashier        User         @relation(fields: [cashierId], references: [id])
+  shift          Shift        @relation(fields: [shiftId], references: [id])
+  items          ReturnItem[]
+
+  @@map("returns")
+}
+
+model ReturnItem {
+  id                 String   @id @default(uuid())
+  returnId           String
+  originalSaleItemId String
+  productId          String
+  quantityReturned   Decimal  @db.Decimal(12, 3)
+  refundPrice        Decimal  @db.Decimal(12, 2)
+  isDamaged          Boolean  @default(false)
+  return             Return   @relation(fields: [returnId], references: [id], onDelete: Cascade)
+  originalSaleItem   SaleItem @relation(fields: [originalSaleItemId], references: [id])
+  product            Product  @relation(fields: [productId], references: [id])
+
+  @@map("return_items")
+}
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  userId      String?
+  action      String
+  entityType  String
+  entityId    String?
+  detailsJson String?  @db.Text
+  ipAddress   String?
+  createdAt   DateTime @default(now())
+  user        User?    @relation(fields: [userId], references: [id])
+
+  @@map("audit_logs")
+}
