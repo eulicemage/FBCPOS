@@ -36,3 +36,4 @@ export function useBarcodeScanner({ onScan, enabled = true }: UseBarcodeScannerP
     handleKeyPress,
   };
 }
+
