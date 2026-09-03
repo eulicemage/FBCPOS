@@ -96,3 +96,4 @@ describe('ShiftStore', () => {
     expect(useShiftStore.getState().isStoreOpen).toBe(false);
   });
 });
+

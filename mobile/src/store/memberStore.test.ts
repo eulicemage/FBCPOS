@@ -50,6 +50,32 @@ describe('MemberStore', () => {
     expect(found?.monthlyAllowance).toBe(2500.0);
   });
 
+  it('tops up member points dynamically on the fly', () => {
+    const res = useMemberStore.getState().topUpPoints('mem-1', 500.0);
+    expect(res.success).toBe(true);
+    expect(res.newBalance).toBe(2000.0);
+
+    const updated = useMemberStore.getState().findMemberById('mem-1');
+    expect(updated?.currentPointsBalance).toBe(2000.0);
+  });
+
+  it('configures global default monthly allowance', () => {
+    useMemberStore.getState().setDefaultMonthlyAllowance(3000.0);
+    expect(useMemberStore.getState().defaultMonthlyAllowance).toBe(3000.0);
+
+    const newMember = useMemberStore.getState().addMember({
+      fullName: 'David Lee',
+    });
+    expect(newMember.monthlyAllowance).toBe(3000.0);
+    expect(newMember.currentPointsBalance).toBe(3000.0);
+  });
+
+  it('deactivates member', () => {
+    useMemberStore.getState().deleteMember('mem-2');
+    const found = useMemberStore.getState().findMemberByBarcode('990001002');
+    expect(found).toBeUndefined();
+  });
+
   it('resets all monthly allowances', () => {
     useMemberStore.getState().deductPoints('mem-1', 500.0);
     expect(useMemberStore.getState().findMemberById('mem-1')?.currentPointsBalance).toBe(1000.0);

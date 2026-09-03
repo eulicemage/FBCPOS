@@ -19,6 +19,7 @@ export interface AddMemberInput {
   barcode?: string;
   department?: string;
   monthlyAllowance?: number;
+  initialBalance?: number;
 }
 
 export const INITIAL_MEMBERS: Member[] = [
@@ -75,13 +76,17 @@ export const INITIAL_MEMBERS: Member[] = [
 interface MemberStoreState {
   members: Member[];
   selectedMember: Member | null;
+  defaultMonthlyAllowance: number; // Configurable store-wide default allowance
 
+  setDefaultMonthlyAllowance: (amount: number) => void;
   selectMember: (member: Member | null) => void;
   findMemberByBarcode: (barcode: string) => Member | undefined;
   findMemberById: (id: string) => Member | undefined;
   searchMembers: (query: string) => Member[];
   addMember: (input: AddMemberInput) => Member;
   updateMember: (id: string, updates: Partial<Member>) => void;
+  topUpPoints: (id: string, amount: number) => { success: boolean; newBalance: number };
+  deleteMember: (id: string) => void;
   deductPoints: (id: string, amount: number) => { success: boolean; newBalance: number; error?: string };
   resetMemberPoints: (id: string, customAmount?: number) => void;
   resetAllMonthlyAllowances: () => void;
@@ -91,6 +96,13 @@ interface MemberStoreState {
 export const useMemberStore = create<MemberStoreState>((set, get) => ({
   members: INITIAL_MEMBERS,
   selectedMember: null,
+  defaultMonthlyAllowance: 1500.0,
+
+  setDefaultMonthlyAllowance: (amount: number) => {
+    if (amount > 0) {
+      set({ defaultMonthlyAllowance: amount });
+    }
+  },
 
   selectMember: (member) => set({ selectedMember: member }),
 
@@ -107,13 +119,14 @@ export const useMemberStore = create<MemberStoreState>((set, get) => ({
 
   searchMembers: (query: string) => {
     const q = query.trim().toLowerCase();
-    if (!q) return get().members;
+    if (!q) return get().members.filter((m) => m.isActive);
     return get().members.filter(
       (m) =>
-        m.fullName.toLowerCase().includes(q) ||
-        m.barcode.includes(q) ||
-        m.memberNumber.toLowerCase().includes(q) ||
-        (m.department && m.department.toLowerCase().includes(q))
+        m.isActive &&
+        (m.fullName.toLowerCase().includes(q) ||
+          m.barcode.includes(q) ||
+          m.memberNumber.toLowerCase().includes(q) ||
+          (m.department && m.department.toLowerCase().includes(q)))
     );
   },
 
@@ -122,16 +135,18 @@ export const useMemberStore = create<MemberStoreState>((set, get) => ({
     const count = get().members.length + 1;
     const memberNumber = `MEM-${(1000 + count).toString()}`;
     const barcode = input.barcode?.trim() || `99000${(1000 + count).toString()}`;
-    const allowance = input.monthlyAllowance !== undefined ? input.monthlyAllowance : 1500.0;
+    const allowance =
+      input.monthlyAllowance !== undefined ? input.monthlyAllowance : get().defaultMonthlyAllowance;
+    const balance = input.initialBalance !== undefined ? input.initialBalance : allowance;
 
     const newMember: Member = {
       id,
       memberNumber,
       barcode,
       fullName: input.fullName.trim(),
-      department: input.department?.trim() || 'General',
+      department: input.department?.trim() || 'General Staff',
       monthlyAllowance: allowance,
-      currentPointsBalance: allowance,
+      currentPointsBalance: balance,
       consumedThisMonth: 0,
       lastResetDate: new Date().toISOString().slice(0, 10),
       isActive: true,
@@ -153,6 +168,23 @@ export const useMemberStore = create<MemberStoreState>((set, get) => ({
         state.selectedMember?.id === id
           ? { ...state.selectedMember, ...updates }
           : state.selectedMember,
+    }));
+  },
+
+  topUpPoints: (id: string, amount: number) => {
+    const member = get().findMemberById(id);
+    if (!member) {
+      return { success: false, newBalance: 0 };
+    }
+    const newBal = Math.round((member.currentPointsBalance + amount) * 100) / 100;
+    get().updateMember(id, { currentPointsBalance: newBal });
+    return { success: true, newBalance: newBal };
+  },
+
+  deleteMember: (id: string) => {
+    set((state) => ({
+      members: state.members.map((m) => (m.id === id ? { ...m, isActive: false } : m)),
+      selectedMember: state.selectedMember?.id === id ? null : state.selectedMember,
     }));
   },
 
@@ -225,6 +257,7 @@ export const useMemberStore = create<MemberStoreState>((set, get) => ({
     set({
       members: INITIAL_MEMBERS,
       selectedMember: null,
+      defaultMonthlyAllowance: 1500.0,
     });
   },
 }));

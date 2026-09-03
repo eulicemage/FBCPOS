@@ -473,3 +473,4 @@ const styles = StyleSheet.create({
   },
   closeActionText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 13 },
 });
+

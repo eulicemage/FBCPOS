@@ -60,3 +60,4 @@ describe('ProductStore', () => {
     expect(categories.some((c) => c.code === 'FRU')).toBe(true);
   });
 });
+

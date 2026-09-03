@@ -89,3 +89,4 @@ export class HardwareManager {
     return HardwareManager.transport.send(data);
   }
 }
+

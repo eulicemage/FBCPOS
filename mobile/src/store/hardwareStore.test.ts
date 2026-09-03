@@ -43,3 +43,4 @@ describe('HardwareStore', () => {
     expect(result.bytesSent).toBeGreaterThan(0);
   });
 });
+

@@ -334,3 +334,4 @@ const styles = StyleSheet.create({
   },
   closeFooterBtnText: { color: '#FFFFFF', fontSize: 13, fontWeight: '600' },
 });
+
