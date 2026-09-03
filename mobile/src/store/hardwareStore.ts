@@ -6,6 +6,7 @@ import {
   PrintReceiptParams,
   XReadingParams,
   ZReadingParams,
+  ReturnSlipParams,
 } from '../services/printerService';
 import {
   HardwareManager,
@@ -42,6 +43,8 @@ interface HardwareState {
   printReceipt: (params: PrintReceiptParams) => Promise<PrintResult>;
   printXReading: (params: XReadingParams) => Promise<PrintResult>;
   printZReading: (params: ZReadingParams) => Promise<PrintResult>;
+  printReturnSlip: (params: ReturnSlipParams) => Promise<PrintResult>;
+  printRaw: (bytes: Uint8Array) => Promise<PrintResult>;
 }
 
 export const useHardwareStore = create<HardwareState>((set, get) => ({
@@ -147,6 +150,46 @@ export const useHardwareStore = create<HardwareState>((set, get) => ({
       const bytes = PrinterService.formatZReading(params, {
         paperWidth: get().paperWidth,
       });
+      const result = await HardwareManager.printBuffer(bytes);
+      set({ lastPrintResult: result, isPrinting: false });
+      return result;
+    } catch (e: any) {
+      const errResult: PrintResult = {
+        success: false,
+        bytesSent: 0,
+        transportType: get().printerType,
+        error: e.message,
+      };
+      set({ lastPrintResult: errResult, isPrinting: false });
+      return errResult;
+    }
+  },
+
+  printReturnSlip: async (params: ReturnSlipParams) => {
+    set({ isPrinting: true });
+    try {
+      const bytes = PrinterService.formatReturnSlip(params, {
+        paperWidth: get().paperWidth,
+        drawerPin: get().drawerPin,
+      });
+      const result = await HardwareManager.printBuffer(bytes);
+      set({ lastPrintResult: result, isPrinting: false });
+      return result;
+    } catch (e: any) {
+      const errResult: PrintResult = {
+        success: false,
+        bytesSent: 0,
+        transportType: get().printerType,
+        error: e.message,
+      };
+      set({ lastPrintResult: errResult, isPrinting: false });
+      return errResult;
+    }
+  },
+
+  printRaw: async (bytes: Uint8Array) => {
+    set({ isPrinting: true });
+    try {
       const result = await HardwareManager.printBuffer(bytes);
       set({ lastPrintResult: result, isPrinting: false });
       return result;

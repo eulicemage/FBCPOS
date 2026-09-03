@@ -880,6 +880,8 @@ const styles = StyleSheet.create({
   summaryValue: { color: '#F8FAFC', fontSize: 11, fontWeight: '600' },
   summaryLabelSm: { color: '#64748B', fontSize: 10 },
   summaryValueSm: { color: '#94A3B8', fontSize: 10 },
+  summaryLabelSub: { color: '#64748B', fontSize: 10 },
+  summaryValueSub: { color: '#94A3B8', fontSize: 10 },
   textDiscount: { color: '#10B981' },
   discountBadge: {
     backgroundColor: '#065F46',

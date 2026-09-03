@@ -62,3 +62,4 @@ describe('SyncQueueStore', () => {
     expect(useSyncQueueStore.getState().isSimulatedOffline).toBe(true);
   });
 });
+
