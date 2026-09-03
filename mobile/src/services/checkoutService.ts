@@ -4,7 +4,7 @@ import { roundTo2Decimals } from '../../../shared/src/calculations';
 
 // ─── Types ───────────────────────────────────────────────────
 
-export type PaymentMethod = 'CASH' | 'CARD' | 'EWALLET_GCASH' | 'EWALLET_MAYA' | 'OTHER';
+export type PaymentMethod = 'CASH' | 'CARD' | 'EWALLET_GCASH' | 'EWALLET_MAYA' | 'POINTS' | 'OTHER';
 
 export interface TenderEntry {
   id: string;
@@ -15,6 +15,8 @@ export interface TenderEntry {
   referenceNumber?: string;
   cardBrand?: string;
   cardLastFour?: string;
+  memberBarcode?: string;
+  memberPointsBalance?: number;
 }
 
 export interface SaleRecord {
@@ -38,10 +40,12 @@ export interface SaleRecord {
   taxAmount: number;
   totalAmount: number;
 
-  // Customer
+  // Customer & Member
   customerName?: string;
   customerTinId?: string;
   seniorIdNumber?: string;
+  memberBarcode?: string;
+  memberPointsBalance?: number;
 
   // Payments
   payments: TenderEntry[];
@@ -213,6 +217,8 @@ export function finalizeCheckout(
     customerName?: string;
     customerTinId?: string;
     seniorIdNumber?: string;
+    memberBarcode?: string;
+    memberPointsBalance?: number;
   },
   config: CheckoutConfig
 ): CheckoutResult {
@@ -268,6 +274,8 @@ export function finalizeCheckout(
     customerName: customerInfo.customerName,
     customerTinId: customerInfo.customerTinId,
     seniorIdNumber: customerInfo.seniorIdNumber,
+    memberBarcode: customerInfo.memberBarcode,
+    memberPointsBalance: customerInfo.memberPointsBalance,
 
     payments,
     totalTendered: paymentValidation.totalTendered,

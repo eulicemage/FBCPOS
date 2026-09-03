@@ -6,9 +6,11 @@ import {
   TouchableOpacity,
   Modal,
   ScrollView,
+  Alert,
 } from 'react-native';
 import { SaleRecord } from '../services/checkoutService';
 import { DiscountType } from '../../../shared/src';
+import { useHardwareStore } from '../store/hardwareStore';
 
 interface ReceiptModalProps {
   visible: boolean;
@@ -175,6 +177,17 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
               </View>
             )}
 
+            {sale.memberPointsBalance !== undefined && (
+              <View style={[styles.summaryRow, { backgroundColor: '#F3E8FF', padding: 4, borderRadius: 4 }]}>
+                <Text style={[styles.paymentLabel, { color: '#6B21A8', fontWeight: 'bold' }]}>
+                  REMAINING POINTS BAL:
+                </Text>
+                <Text style={[styles.paymentValue, { color: '#6B21A8', fontWeight: 'bold' }]}>
+                  ₱{sale.memberPointsBalance.toFixed(2)}
+                </Text>
+              </View>
+            )}
+
             <View style={styles.divider} />
 
             {/* Footer */}
@@ -190,9 +203,53 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
           <View style={styles.actionRow}>
             <TouchableOpacity
               style={styles.printBtn}
-              onPress={onPrint || (() => {})}
+              onPress={async () => {
+                if (onPrint) {
+                  onPrint();
+                } else {
+                  const res = await useHardwareStore.getState().printReceipt({
+                    branchName: 'Downtown Flagship',
+                    branchAddress: '123 Rizal Ave, Manila',
+                    taxId: '100-001-000-000',
+                    invoiceNumber: sale.invoiceNumber,
+                    cashierName: sale.cashierName,
+                    terminalNumber: sale.terminalNumber,
+                    customerName: sale.customerName,
+                    seniorIdNumber: sale.seniorIdNumber,
+                    memberBarcode: sale.memberBarcode,
+                    memberPointsBalance: sale.memberPointsBalance,
+                    items: sale.items.map((i) => ({
+                      name: i.productName,
+                      quantity: i.quantity,
+                      unitPrice: i.unitPrice,
+                      totalAmount: i.totalAmount,
+                    })),
+                    subtotal: sale.subtotalAmount,
+                    discountAmount: sale.discountAmount,
+                    vatableAmount: sale.vatableAmount,
+                    vatExemptAmount: sale.vatExemptAmount,
+                    vatAmount: sale.taxAmount,
+                    totalDue: sale.totalAmount,
+                    amountReceived: sale.totalTendered,
+                    changeAmount: sale.totalChange,
+                    paymentMethod: sale.payments[0]?.method || 'CASH',
+                    payments: sale.payments.map((p) => ({
+                      method: p.method,
+                      amountTendered: p.amountTendered,
+                      referenceNumber: p.referenceNumber,
+                    })),
+                    date: sale.createdAt,
+                  });
+                  Alert.alert(
+                    'Receipt Printed',
+                    `Official receipt dispatched to ${useHardwareStore.getState().paperWidth} printer.`
+                  );
+                }
+              }}
             >
-              <Text style={styles.printBtnText}>🖨 Print Receipt</Text>
+              <Text style={styles.printBtnText}>
+                🖨 Print ({useHardwareStore.getState().paperWidth})
+              </Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.newSaleBtn} onPress={onNewSale}>

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import {
   StyleSheet,
   View,
@@ -11,122 +11,35 @@ import {
 } from 'react-native';
 import { useCartStore } from '../store/cartStore';
 import { useAuthStore } from '../store/authStore';
+import { useProductStore } from '../store/productStore';
+import { useMemberStore, Member } from '../store/memberStore';
+import { useShiftStore } from '../store/shiftStore';
+import { useHardwareStore } from '../store/hardwareStore';
 import { useHeldCartStore, HeldCart } from '../store/heldCartStore';
 import { Product, DiscountType } from '../../../shared/src';
+
 import { DiscountModal } from '../components/DiscountModal';
 import { HeldCartsModal } from '../components/HeldCartsModal';
 import { PriceCheckModal } from '../components/PriceCheckModal';
 import { SupervisorPinModal } from '../components/SupervisorPinModal';
+import { QuickAddProductModal } from '../components/QuickAddProductModal';
+import { MemberManagementModal } from '../components/MemberManagementModal';
+import { ShiftReadingModal, ReadingType } from '../components/ShiftReadingModal';
+import { ShiftHistoryModal } from '../components/ShiftHistoryModal';
+import { HardwareSettingsModal } from '../components/HardwareSettingsModal';
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
-
-const SAMPLE_CATEGORIES = [
-  { id: '1', code: 'ALL', name: 'All Items' },
-  { id: '2', code: 'BEV', name: 'Beverages' },
-  { id: '3', code: 'BAK', name: 'Bakery' },
-  { id: '4', code: 'DAI', name: 'Dairy & Eggs' },
-  { id: '5', code: 'CAN', name: 'Canned Goods' },
-  { id: '6', code: 'SNK', name: 'Snacks' },
-];
-
-const SAMPLE_PRODUCTS: Product[] = [
-  {
-    id: 'p1',
-    categoryId: '2',
-    sku: 'BEV-001',
-    barcode: '4800016601011',
-    name: 'Fresh Whole Milk 1L',
-    costPrice: 72.0,
-    sellingPrice: 95.0,
-    isTaxable: true,
-    taxRate: 0.12,
-    unitOfMeasure: 'PCS',
-    isActive: true,
-    createdAt: '',
-    updatedAt: '',
-  },
-  {
-    id: 'p2',
-    categoryId: '2',
-    sku: 'BEV-002',
-    barcode: '4800016601028',
-    name: 'Orange Juice 1L Pure',
-    costPrice: 85.0,
-    sellingPrice: 110.0,
-    isTaxable: true,
-    taxRate: 0.12,
-    unitOfMeasure: 'PCS',
-    isActive: true,
-    createdAt: '',
-    updatedAt: '',
-  },
-  {
-    id: 'p3',
-    categoryId: '3',
-    sku: 'BAK-001',
-    barcode: '4800026602012',
-    name: 'Whole Wheat Loaf 500g',
-    costPrice: 48.0,
-    sellingPrice: 65.0,
-    isTaxable: true,
-    taxRate: 0.12,
-    unitOfMeasure: 'PACK',
-    isActive: true,
-    createdAt: '',
-    updatedAt: '',
-  },
-  {
-    id: 'p4',
-    categoryId: '4',
-    sku: 'DAI-001',
-    barcode: '4800036603013',
-    name: 'Organic Brown Eggs 12s',
-    costPrice: 110.0,
-    sellingPrice: 145.0,
-    isTaxable: true,
-    taxRate: 0.12,
-    unitOfMeasure: 'TRAY',
-    isActive: true,
-    createdAt: '',
-    updatedAt: '',
-  },
-  {
-    id: 'p5',
-    categoryId: '5',
-    sku: 'CAN-001',
-    barcode: '4800046604014',
-    name: 'Canned Tuna Flakes 180g',
-    costPrice: 32.0,
-    sellingPrice: 45.0,
-    isTaxable: true,
-    taxRate: 0.12,
-    unitOfMeasure: 'CAN',
-    isActive: true,
-    createdAt: '',
-    updatedAt: '',
-  },
-  {
-    id: 'p6',
-    categoryId: '6',
-    sku: 'SNK-001',
-    barcode: '4800056605015',
-    name: 'Potato Crisps Salted 100g',
-    costPrice: 28.0,
-    sellingPrice: 38.0,
-    isTaxable: true,
-    taxRate: 0.12,
-    unitOfMeasure: 'POUCH',
-    isActive: true,
-    createdAt: '',
-    updatedAt: '',
-  },
-];
 
 interface POSScreenProps {
   onNavigateToCheckout?: () => void;
+  onSwitchCashier?: () => void;
 }
 
-export const POSScreen: React.FC<POSScreenProps> = ({ onNavigateToCheckout }) => {
-  const { currentUser, currentBranch, currentTerminal, isOnline } = useAuthStore();
+export const POSScreen: React.FC<POSScreenProps> = ({
+  onNavigateToCheckout,
+  onSwitchCashier,
+}) => {
+  const { currentUser, currentBranch, currentTerminal, isOnline, isBypassMode, toggleBypassMode } =
+    useAuthStore();
   const {
     items,
     discountType,
@@ -137,6 +50,7 @@ export const POSScreen: React.FC<POSScreenProps> = ({ onNavigateToCheckout }) =>
     removeItem,
     applyDiscount,
     applySeniorDiscount,
+    setCustomerInfo,
     clearCart,
     loadCart,
     getSubtotal,
@@ -147,18 +61,29 @@ export const POSScreen: React.FC<POSScreenProps> = ({ onNavigateToCheckout }) =>
     getTotalAmount,
   } = useCartStore();
 
+  const { products, categories, selectedCategory, setSelectedCategory, findProductByBarcode } =
+    useProductStore();
+  const { findMemberByBarcode } = useMemberStore();
+  const { currentShift, recordVoid } = useShiftStore();
+  const { kickCashDrawer } = useHardwareStore();
   const { heldCarts, holdCart } = useHeldCartStore();
 
-  // Local state
+  // Local search & barcode state
   const [searchQuery, setSearchQuery] = useState('');
   const [barcodeInput, setBarcodeInput] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
 
   // Modals
   const [discountModalVisible, setDiscountModalVisible] = useState(false);
   const [heldCartsModalVisible, setHeldCartsModalVisible] = useState(false);
   const [priceCheckModalVisible, setPriceCheckModalVisible] = useState(false);
   const [supervisorModalVisible, setSupervisorModalVisible] = useState(false);
+  const [quickAddModalVisible, setQuickAddModalVisible] = useState(false);
+  const [pendingAddBarcode, setPendingAddBarcode] = useState('');
+  const [memberModalVisible, setMemberModalVisible] = useState(false);
+  const [readingModalVisible, setReadingModalVisible] = useState(false);
+  const [readingType, setReadingType] = useState<ReadingType>('X_READ');
+  const [historyModalVisible, setHistoryModalVisible] = useState(false);
+  const [hardwareModalVisible, setHardwareModalVisible] = useState(false);
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
 
   // Hardware Barcode Scanner Hook
@@ -166,16 +91,53 @@ export const POSScreen: React.FC<POSScreenProps> = ({ onNavigateToCheckout }) =>
     onScan: (scannedBarcode) => {
       handleBarcodeScan(scannedBarcode);
     },
-    enabled: !discountModalVisible && !heldCartsModalVisible && !priceCheckModalVisible,
+    enabled:
+      !discountModalVisible &&
+      !heldCartsModalVisible &&
+      !priceCheckModalVisible &&
+      !quickAddModalVisible &&
+      !memberModalVisible &&
+      !readingModalVisible &&
+      !hardwareModalVisible,
   });
 
   const handleBarcodeScan = (code: string) => {
-    const found = SAMPLE_PRODUCTS.find((p) => p.barcode === code.trim());
-    if (found) {
-      addItem(found);
+    const cleaned = code.trim();
+    if (!cleaned) return;
+
+    // 1. Check if barcode belongs to a Member ID card
+    const member = findMemberByBarcode(cleaned);
+    if (member) {
+      setCustomerInfo(member.fullName);
+      Alert.alert(
+        '👤 Member Card Identified',
+        `Member: ${member.fullName}\nID Barcode: ${member.barcode}\nMonthly Allowance: ₱${member.monthlyAllowance.toFixed(2)}\nAvailable Consumable: ₱${member.currentPointsBalance.toFixed(2)}`
+      );
+      setBarcodeInput('');
+      return;
+    }
+
+    // 2. Check if barcode belongs to a Product
+    const foundProduct = findProductByBarcode(cleaned);
+    if (foundProduct) {
+      addItem(foundProduct);
       setBarcodeInput('');
     } else {
-      Alert.alert('Barcode Not Found', `No registered item matching barcode ${code}`);
+      // 3. Unregistered barcode: prompt to add dynamically!
+      Alert.alert(
+        'Barcode Not Registered',
+        `No registered product matching barcode "${cleaned}".\nWould you like to add this product to the catalog now?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: '➕ Add Product',
+            onPress: () => {
+              setPendingAddBarcode(cleaned);
+              setQuickAddModalVisible(true);
+            },
+          },
+        ]
+      );
     }
   };
 
@@ -184,13 +146,7 @@ export const POSScreen: React.FC<POSScreenProps> = ({ onNavigateToCheckout }) =>
       Alert.alert('Hold Sale', 'Cart is empty. Nothing to hold.');
       return;
     }
-    const held = holdCart(
-      items,
-      getSubtotal(),
-      discountType,
-      discountValue,
-      customerName
-    );
+    const held = holdCart(items, getSubtotal(), discountType, discountValue, customerName);
     if (held) {
       clearCart();
       Alert.alert('Sale Held', `Transaction ticket ${held.ticketNumber} held successfully.`);
@@ -198,22 +154,20 @@ export const POSScreen: React.FC<POSScreenProps> = ({ onNavigateToCheckout }) =>
   };
 
   const handleRecallCart = (cart: HeldCart) => {
-    loadCart(
-      cart.items,
-      cart.discountType,
-      cart.discountValue,
-      cart.customerName,
-      cart.customerTinId
-    );
+    loadCart(cart.items, cart.discountType, cart.discountValue, cart.customerName, cart.customerTinId);
   };
 
   const handleItemVoid = (productId: string, productName: string) => {
-    // Requires supervisor approval if cart has more than 3 items or value > 500
-    if (getTotalAmount() > 500) {
-      setPendingAction(() => () => removeItem(productId));
-      setSupervisorModalVisible(true);
-    } else {
+    // If Bypass Mode is ON, skip supervisor approval completely!
+    if (isBypassMode || getTotalAmount() <= 500) {
       removeItem(productId);
+      recordVoid();
+    } else {
+      setPendingAction(() => () => {
+        removeItem(productId);
+        recordVoid();
+      });
+      setSupervisorModalVisible(true);
     }
   };
 
@@ -225,63 +179,120 @@ export const POSScreen: React.FC<POSScreenProps> = ({ onNavigateToCheckout }) =>
     }
   };
 
-  const filteredProducts = SAMPLE_PRODUCTS.filter((product) => {
+  const handleOpenDrawer = async () => {
+    const res = await kickCashDrawer();
+    Alert.alert('Cash Drawer Opened', `Drawer kick pulse dispatched.`);
+  };
+
+  const handleOpenXRead = () => {
+    setReadingType('X_READ');
+    setReadingModalVisible(true);
+  };
+
+  const handleOpenZRead = () => {
+    setReadingType('Z_READ');
+    setReadingModalVisible(true);
+  };
+
+  const filteredProducts = products.filter((product) => {
     const matchesCategory =
       selectedCategory === 'ALL' ||
-      SAMPLE_CATEGORIES.find((c) => c.code === selectedCategory)?.id === product.categoryId;
+      categories.find((c) => c.code === selectedCategory)?.id === product.categoryId;
     const matchesSearch =
       product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       product.barcode.includes(searchQuery) ||
       product.sku.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesCategory && matchesSearch;
+    return matchesCategory && matchesSearch && product.isActive;
   });
 
   return (
     <View style={styles.container}>
-      {/* Top Tablet Header Bar */}
+      {/* Top Tablet Navigation & Control Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <Text style={styles.brandTitle}>FoodBaskets POS</Text>
           <Text style={styles.terminalBadge}>
-            {currentBranch?.code} • {currentTerminal?.name}
+            {currentBranch?.code} • {currentTerminal?.name} • Shift #{currentShift?.shiftNumber || '101'}
           </Text>
-          <View style={[styles.statusBadge, isOnline ? styles.badgeOnline : styles.badgeOffline]}>
-            <Text style={styles.statusText}>{isOnline ? 'ONLINE' : 'OFFLINE'}</Text>
-          </View>
-        </View>
 
-        <View style={styles.headerRight}>
+          {/* Master Bypass Mode Button / Badge */}
           <TouchableOpacity
-            style={styles.headerActionBtn}
-            onPress={() => setPriceCheckModalVisible(true)}
+            style={[styles.bypassBtn, isBypassMode && styles.bypassBtnActive]}
+            onPress={() => {
+              toggleBypassMode();
+              Alert.alert(
+                'Master Bypass Mode',
+                !isBypassMode
+                  ? 'Bypass Mode ENABLED: All restrictions, PIN authorizations, and product modifications unlocked.'
+                  : 'Bypass Mode DISABLED: Standard cashier security reinstated.'
+              );
+            }}
           >
-            <Text style={styles.headerActionText}>🔍 Price Check (F6)</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.headerActionBtn}
-            onPress={() => setHeldCartsModalVisible(true)}
-          >
-            <Text style={styles.headerActionText}>
-              ⏳ Recall ({heldCarts.length}) (F5)
+            <Text style={[styles.bypassText, isBypassMode && styles.bypassTextActive]}>
+              {isBypassMode ? '🔓 BYPASS ACTIVE' : '🔒 BYPASS (F10)'}
             </Text>
           </TouchableOpacity>
+        </View>
+
+        {/* Header Right Action Bar */}
+        <View style={styles.headerRight}>
+          <TouchableOpacity
+            style={[styles.headerActionBtn, styles.addProdBtn]}
+            onPress={() => {
+              setPendingAddBarcode('');
+              setQuickAddModalVisible(true);
+            }}
+          >
+            <Text style={styles.addProdText}>➕ Add Item (F9)</Text>
+          </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.headerActionBtn, styles.holdBtn]}
-            onPress={handleHoldSale}
+            style={[styles.headerActionBtn, styles.memberBtn]}
+            onPress={() => setMemberModalVisible(true)}
           >
-            <Text style={styles.holdBtnText}>⏸ Hold Sale (F4)</Text>
+            <Text style={styles.memberBtnText}>👥 Members (₱1.5k)</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.headerActionBtn, styles.xReadBtn]}
+            onPress={handleOpenXRead}
+          >
+            <Text style={styles.xReadText}>⇄ X-Read (Switch)</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.headerActionBtn, styles.zReadBtn]}
+            onPress={handleOpenZRead}
+          >
+            <Text style={styles.zReadText}>🛑 Z-Read (Close)</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.headerActionBtn}
+            onPress={() => setHistoryModalVisible(true)}
+          >
+            <Text style={styles.headerActionText}>📜 Archive</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.headerActionBtn}
+            onPress={() => setHardwareModalVisible(true)}
+          >
+            <Text style={styles.headerActionText}>⚙ Xprinter</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.drawerBtn} onPress={handleOpenDrawer}>
+            <Text style={styles.drawerBtnText}>💵 Drawer</Text>
           </TouchableOpacity>
 
           <View style={styles.cashierInfo}>
-            <Text style={styles.cashierName}>{currentUser?.fullName}</Text>
+            <Text style={styles.cashierName}>{currentShift?.cashierName || currentUser?.fullName}</Text>
             <Text style={styles.cashierRole}>{currentUser?.role}</Text>
           </View>
         </View>
       </View>
 
-      {/* Main Workspace Split Layout */}
+      {/* Main Split Layout */}
       <View style={styles.mainWorkspace}>
         {/* Left 62%: Catalog, Barcode Scanner, and Categories */}
         <View style={styles.catalogSection}>
@@ -290,7 +301,7 @@ export const POSScreen: React.FC<POSScreenProps> = ({ onNavigateToCheckout }) =>
             <View style={styles.barcodeBox}>
               <TextInput
                 style={styles.barcodeInput}
-                placeholder="Scan / Type Barcode..."
+                placeholder="Scan / Type Barcode or Member ID..."
                 placeholderTextColor="#64748B"
                 value={barcodeInput}
                 onChangeText={setBarcodeInput}
@@ -315,12 +326,8 @@ export const POSScreen: React.FC<POSScreenProps> = ({ onNavigateToCheckout }) =>
           </View>
 
           {/* Category Ribbon */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.categoryRibbon}
-          >
-            {SAMPLE_CATEGORIES.map((cat) => (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryRibbon}>
+            {categories.map((cat) => (
               <TouchableOpacity
                 key={cat.id}
                 style={[
@@ -362,13 +369,13 @@ export const POSScreen: React.FC<POSScreenProps> = ({ onNavigateToCheckout }) =>
           />
         </View>
 
-        {/* Right 38%: Active Cart, Calculations & Tender Actions */}
+        {/* Right 38%: Active Cart, Financials & Actions */}
         <View style={styles.cartSection}>
           <View style={styles.cartHeader}>
             <View>
               <Text style={styles.cartTitle}>Active Ticket ({items.length} items)</Text>
               {customerName ? (
-                <Text style={styles.customerBadge}>Customer: {customerName}</Text>
+                <Text style={styles.customerBadge}>👤 Member / Customer: {customerName}</Text>
               ) : null}
             </View>
             <TouchableOpacity onPress={clearCart} disabled={items.length === 0}>
@@ -378,13 +385,13 @@ export const POSScreen: React.FC<POSScreenProps> = ({ onNavigateToCheckout }) =>
             </TouchableOpacity>
           </View>
 
-          {/* Cart Item Rows */}
+          {/* Cart Items List */}
           <ScrollView style={styles.cartList}>
             {items.length === 0 ? (
               <View style={styles.emptyCartContainer}>
                 <Text style={styles.emptyCartText}>Cart is empty</Text>
                 <Text style={styles.emptyCartSub}>
-                  Scan a barcode or tap an item on the left to start sale
+                  Scan product or member card, or tap item on the left to start sale
                 </Text>
               </View>
             ) : (
@@ -426,7 +433,7 @@ export const POSScreen: React.FC<POSScreenProps> = ({ onNavigateToCheckout }) =>
             )}
           </ScrollView>
 
-          {/* Financial Breakdown & Tax Summary */}
+          {/* Financial Breakdown */}
           <View style={styles.cartSummary}>
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>Gross Subtotal</Text>
@@ -439,7 +446,9 @@ export const POSScreen: React.FC<POSScreenProps> = ({ onNavigateToCheckout }) =>
                 {discountType !== DiscountType.NONE ? (
                   <View style={styles.discountBadge}>
                     <Text style={styles.discountBadgeText}>
-                      {discountType === DiscountType.SENIOR_PWD ? 'SENIOR/PWD 20%' : `${discountValue}%`}
+                      {discountType === DiscountType.SENIOR_PWD
+                        ? 'SENIOR/PWD 20%'
+                        : `${discountValue}%`}
                     </Text>
                   </View>
                 ) : null}
@@ -470,7 +479,7 @@ export const POSScreen: React.FC<POSScreenProps> = ({ onNavigateToCheckout }) =>
             </View>
           </View>
 
-          {/* Action Bar — Professional POS Layout */}
+          {/* Action Bar — Professional Retail POS */}
           <View style={styles.cartActions}>
             <TouchableOpacity
               style={styles.discountActionBtn}
@@ -494,7 +503,14 @@ export const POSScreen: React.FC<POSScreenProps> = ({ onNavigateToCheckout }) =>
               onPress={() => {
                 Alert.alert('Void Sale', 'Clear the entire cart?', [
                   { text: 'Cancel', style: 'cancel' },
-                  { text: 'Void', style: 'destructive', onPress: clearCart },
+                  {
+                    text: 'Void',
+                    style: 'destructive',
+                    onPress: () => {
+                      clearCart();
+                      recordVoid();
+                    },
+                  },
                 ]);
               }}
             >
@@ -522,7 +538,39 @@ export const POSScreen: React.FC<POSScreenProps> = ({ onNavigateToCheckout }) =>
         </View>
       </View>
 
-      {/* Modals */}
+      {/* Modals Suite */}
+      <QuickAddProductModal
+        visible={quickAddModalVisible}
+        initialBarcode={pendingAddBarcode}
+        onClose={() => setQuickAddModalVisible(false)}
+        onProductAdded={(newProd) => addItem(newProd)}
+      />
+
+      <MemberManagementModal
+        visible={memberModalVisible}
+        onClose={() => setMemberModalVisible(false)}
+        onSelectMember={(m: Member) => setCustomerInfo(m.fullName)}
+      />
+
+      <ShiftReadingModal
+        visible={readingModalVisible}
+        type={readingType}
+        onClose={() => setReadingModalVisible(false)}
+        onShiftClosed={() => {
+          if (onSwitchCashier) onSwitchCashier();
+        }}
+      />
+
+      <ShiftHistoryModal
+        visible={historyModalVisible}
+        onClose={() => setHistoryModalVisible(false)}
+      />
+
+      <HardwareSettingsModal
+        visible={hardwareModalVisible}
+        onClose={() => setHardwareModalVisible(false)}
+      />
+
       <DiscountModal
         visible={discountModalVisible}
         onClose={() => setDiscountModalVisible(false)}
@@ -543,9 +591,9 @@ export const POSScreen: React.FC<POSScreenProps> = ({ onNavigateToCheckout }) =>
 
       <PriceCheckModal
         visible={priceCheckModalVisible}
-        products={SAMPLE_PRODUCTS}
+        products={products}
         onClose={() => setPriceCheckModalVisible(false)}
-        onAddToCart={(product) => addItem(product)}
+        onAddToCart={(p) => addItem(p)}
       />
 
       <SupervisorPinModal
@@ -563,105 +611,70 @@ export const POSScreen: React.FC<POSScreenProps> = ({ onNavigateToCheckout }) =>
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0F172A',
-  },
+  container: { flex: 1, backgroundColor: '#0F172A' },
   header: {
-    height: 60,
+    height: 58,
     backgroundColor: '#1E293B',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#334155',
   },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
+  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  brandTitle: { color: '#38BDF8', fontSize: 17, fontWeight: 'bold' },
+  terminalBadge: { color: '#94A3B8', fontSize: 11, fontWeight: '600' },
+  bypassBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+    backgroundColor: '#334155',
+    borderWidth: 1,
+    borderColor: '#475569',
   },
-  brandTitle: {
-    color: '#38BDF8',
-    fontSize: 18,
-    fontWeight: 'bold',
+  bypassBtnActive: {
+    backgroundColor: '#78350F',
+    borderColor: '#F59E0B',
   },
-  terminalBadge: {
-    color: '#94A3B8',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
-  },
-  badgeOnline: {
-    backgroundColor: '#065F46',
-  },
-  badgeOffline: {
-    backgroundColor: '#991B1B',
-  },
-  statusText: {
-    color: '#FFFFFF',
-    fontSize: 10,
-    fontWeight: 'bold',
-  },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
+  bypassText: { color: '#94A3B8', fontSize: 11, fontWeight: 'bold' },
+  bypassTextActive: { color: '#FCD34D' },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   headerActionBtn: {
     backgroundColor: '#0F172A',
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 6,
     borderWidth: 1,
     borderColor: '#334155',
   },
-  headerActionText: {
-    color: '#CBD5E1',
-    fontSize: 12,
-    fontWeight: '600',
+  headerActionText: { color: '#CBD5E1', fontSize: 11, fontWeight: '600' },
+  addProdBtn: { backgroundColor: '#065F46', borderColor: '#10B981' },
+  addProdText: { color: '#6EE7B7', fontSize: 11, fontWeight: 'bold' },
+  memberBtn: { backgroundColor: '#4C1D95', borderColor: '#8B5CF6' },
+  memberBtnText: { color: '#DDD6FE', fontSize: 11, fontWeight: 'bold' },
+  xReadBtn: { backgroundColor: '#1E3A8A', borderColor: '#3B82F6' },
+  xReadText: { color: '#93C5FD', fontSize: 11, fontWeight: 'bold' },
+  zReadBtn: { backgroundColor: '#7F1D1D', borderColor: '#EF4444' },
+  zReadText: { color: '#FCA5A5', fontSize: 11, fontWeight: 'bold' },
+  drawerBtn: {
+    backgroundColor: '#047857',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
   },
-  holdBtn: {
-    borderColor: '#F59E0B',
-  },
-  holdBtnText: {
-    color: '#F59E0B',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  cashierInfo: {
-    alignItems: 'flex-end',
-    marginLeft: 8,
-  },
-  cashierName: {
-    color: '#F8FAFC',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  cashierRole: {
-    color: '#64748B',
-    fontSize: 11,
-  },
-  mainWorkspace: {
-    flex: 1,
-    flexDirection: 'row',
-  },
+  drawerBtnText: { color: '#FFFFFF', fontSize: 11, fontWeight: 'bold' },
+  cashierInfo: { alignItems: 'flex-end', marginLeft: 6 },
+  cashierName: { color: '#F8FAFC', fontSize: 12, fontWeight: '600' },
+  cashierRole: { color: '#64748B', fontSize: 10 },
+  mainWorkspace: { flex: 1, flexDirection: 'row' },
   catalogSection: {
     flex: 62,
     borderRightWidth: 1,
     borderRightColor: '#334155',
-    padding: 12,
+    padding: 10,
   },
-  searchContainer: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 10,
-  },
+  searchContainer: { flexDirection: 'row', gap: 8, marginBottom: 8 },
   barcodeBox: {
     flex: 1.2,
     flexDirection: 'row',
@@ -671,106 +684,59 @@ const styles = StyleSheet.create({
     borderColor: '#0284C7',
     overflow: 'hidden',
   },
-  barcodeInput: {
-    flex: 1,
-    height: 42,
-    paddingHorizontal: 12,
-    color: '#FFFFFF',
-    fontSize: 14,
-  },
+  barcodeInput: { flex: 1, height: 40, paddingHorizontal: 10, color: '#FFFFFF', fontSize: 13 },
   addBarcodeBtn: {
     backgroundColor: '#0284C7',
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  addBarcodeBtnText: {
-    color: '#FFFFFF',
-    fontWeight: 'bold',
-    fontSize: 13,
-  },
+  addBarcodeBtnText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 12 },
   searchInput: {
     flex: 1,
-    height: 42,
+    height: 40,
     backgroundColor: '#1E293B',
     borderRadius: 8,
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     color: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#334155',
-    fontSize: 14,
+    fontSize: 13,
   },
-  categoryRibbon: {
-    maxHeight: 44,
-    marginBottom: 10,
-  },
+  categoryRibbon: { maxHeight: 40, marginBottom: 8 },
   categoryTab: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
     backgroundColor: '#1E293B',
-    borderRadius: 20,
-    marginRight: 8,
+    borderRadius: 18,
+    marginRight: 6,
     borderWidth: 1,
     borderColor: '#334155',
     justifyContent: 'center',
   },
-  categoryTabActive: {
-    backgroundColor: '#0284C7',
-    borderColor: '#38BDF8',
-  },
-  categoryTabText: {
-    color: '#94A3B8',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  categoryTabTextActive: {
-    color: '#FFFFFF',
-  },
-  gridContent: {
-    paddingBottom: 20,
-  },
+  categoryTabActive: { backgroundColor: '#0284C7', borderColor: '#38BDF8' },
+  categoryTabText: { color: '#94A3B8', fontSize: 12, fontWeight: '600' },
+  categoryTabTextActive: { color: '#FFFFFF' },
+  gridContent: { paddingBottom: 20 },
   productCard: {
     flex: 1 / 3,
     backgroundColor: '#1E293B',
-    margin: 4,
-    padding: 12,
-    borderRadius: 10,
+    margin: 3,
+    padding: 10,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: '#334155',
-    height: 110,
+    height: 105,
     justifyContent: 'space-between',
   },
-  productName: {
-    color: '#F8FAFC',
-    fontSize: 13,
-    fontWeight: 'bold',
-  },
-  productSku: {
-    color: '#64748B',
-    fontSize: 11,
-  },
-  priceRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'baseline',
-  },
-  productPrice: {
-    color: '#38BDF8',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  productUom: {
-    color: '#94A3B8',
-    fontSize: 11,
-  },
-  cartSection: {
-    flex: 38,
-    backgroundColor: '#0F172A',
-    display: 'flex',
-    flexDirection: 'column',
-  },
+  productName: { color: '#F8FAFC', fontSize: 12, fontWeight: 'bold' },
+  productSku: { color: '#64748B', fontSize: 10 },
+  priceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
+  productPrice: { color: '#38BDF8', fontSize: 15, fontWeight: 'bold' },
+  productUom: { color: '#94A3B8', fontSize: 10 },
+  cartSection: { flex: 38, backgroundColor: '#0F172A', display: 'flex', flexDirection: 'column' },
   cartHeader: {
-    padding: 12,
+    padding: 10,
     backgroundColor: '#1E293B',
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -778,40 +744,16 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#334155',
   },
-  cartTitle: {
-    color: '#F8FAFC',
-    fontSize: 15,
-    fontWeight: 'bold',
-  },
-  customerBadge: {
-    color: '#38BDF8',
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  clearCartBtn: {
-    color: '#EF4444',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  disabledText: {
-    color: '#475569',
-  },
-  cartList: {
-    flex: 1,
-    padding: 8,
-  },
-  emptyCartContainer: {
-    paddingVertical: 60,
-    alignItems: 'center',
-  },
-  emptyCartText: {
-    color: '#64748B',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
+  cartTitle: { color: '#F8FAFC', fontSize: 14, fontWeight: 'bold' },
+  customerBadge: { color: '#A78BFA', fontSize: 11, fontWeight: '600', marginTop: 2 },
+  clearCartBtn: { color: '#EF4444', fontSize: 12, fontWeight: '600' },
+  disabledText: { color: '#475569' },
+  cartList: { flex: 1, padding: 6 },
+  emptyCartContainer: { paddingVertical: 50, alignItems: 'center' },
+  emptyCartText: { color: '#64748B', fontSize: 15, fontWeight: 'bold' },
   emptyCartSub: {
     color: '#475569',
-    fontSize: 12,
+    fontSize: 11,
     marginTop: 4,
     textAlign: 'center',
     paddingHorizontal: 20,
@@ -820,133 +762,73 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#1E293B',
-    padding: 10,
-    borderRadius: 8,
-    marginBottom: 6,
+    padding: 8,
+    borderRadius: 6,
+    marginBottom: 5,
     borderWidth: 1,
     borderColor: '#334155',
   },
-  cartItemInfo: {
-    flex: 1,
-  },
-  cartItemName: {
-    color: '#F8FAFC',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  cartItemUnitPrice: {
-    color: '#94A3B8',
-    fontSize: 11,
-    marginTop: 2,
-  },
+  cartItemInfo: { flex: 1 },
+  cartItemName: { color: '#F8FAFC', fontSize: 12, fontWeight: '600' },
+  cartItemUnitPrice: { color: '#94A3B8', fontSize: 10, marginTop: 1 },
   qtyControls: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#0F172A',
     borderRadius: 6,
     paddingHorizontal: 4,
-    marginHorizontal: 8,
+    marginHorizontal: 6,
   },
-  qtyBtn: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  qtyBtnText: {
-    color: '#38BDF8',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
+  qtyBtn: { paddingHorizontal: 6, paddingVertical: 2 },
+  qtyBtnText: { color: '#38BDF8', fontSize: 15, fontWeight: 'bold' },
   qtyText: {
     color: '#FFFFFF',
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: 'bold',
-    minWidth: 20,
+    minWidth: 18,
     textAlign: 'center',
   },
   cartItemTotal: {
     color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: 'bold',
-    minWidth: 65,
-    textAlign: 'right',
-  },
-  deleteBtn: {
-    marginLeft: 8,
-    padding: 4,
-  },
-  deleteBtnText: {
-    color: '#EF4444',
     fontSize: 13,
     fontWeight: 'bold',
+    minWidth: 55,
+    textAlign: 'right',
   },
+  deleteBtn: { marginLeft: 6, padding: 4 },
+  deleteBtnText: { color: '#EF4444', fontSize: 12, fontWeight: 'bold' },
   cartSummary: {
     backgroundColor: '#1E293B',
-    padding: 12,
+    padding: 10,
     borderTopWidth: 1,
     borderTopColor: '#334155',
   },
-  summaryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 4,
-  },
-  summaryLabel: {
-    color: '#94A3B8',
-    fontSize: 12,
-  },
-  summaryValue: {
-    color: '#F8FAFC',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  summaryLabelSub: {
-    color: '#64748B',
-    fontSize: 11,
-  },
-  summaryValueSub: {
-    color: '#94A3B8',
-    fontSize: 11,
-  },
-  textDiscount: {
-    color: '#10B981',
-  },
+  summaryRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 2 },
+  summaryLabel: { color: '#94A3B8', fontSize: 11 },
+  summaryValue: { color: '#F8FAFC', fontSize: 11, fontWeight: '600' },
+  summaryLabelSm: { color: '#64748B', fontSize: 10 },
+  summaryValueSm: { color: '#94A3B8', fontSize: 10 },
+  textDiscount: { color: '#10B981' },
   discountBadge: {
     backgroundColor: '#065F46',
-    paddingHorizontal: 6,
+    paddingHorizontal: 5,
     paddingVertical: 1,
     borderRadius: 4,
   },
-  discountBadgeText: {
-    color: '#6EE7B7',
-    fontSize: 9,
-    fontWeight: 'bold',
-  },
+  discountBadgeText: { color: '#6EE7B7', fontSize: 8, fontWeight: 'bold' },
   totalRow: {
     borderTopWidth: 1,
     borderTopColor: '#334155',
-    marginTop: 6,
-    paddingTop: 6,
+    marginTop: 4,
+    paddingTop: 4,
     alignItems: 'center',
   },
-  totalLabel: {
-    color: '#38BDF8',
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  totalValue: {
-    color: '#38BDF8',
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  cartActions: {
-    flexDirection: 'row',
-    padding: 8,
-    backgroundColor: '#0F172A',
-    gap: 6,
-  },
+  totalLabel: { color: '#38BDF8', fontSize: 13, fontWeight: 'bold' },
+  totalValue: { color: '#38BDF8', fontSize: 18, fontWeight: 'bold' },
+  cartActions: { flexDirection: 'row', padding: 6, backgroundColor: '#0F172A', gap: 5 },
   discountActionBtn: {
     flex: 0.8,
-    height: 56,
+    height: 52,
     backgroundColor: '#1E293B',
     borderRadius: 8,
     alignItems: 'center',
@@ -954,59 +836,34 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#334155',
   },
-  discountActionText: {
-    color: '#CBD5E1',
-    fontWeight: 'bold',
-    fontSize: 11,
-    textAlign: 'center',
-  },
+  discountActionText: { color: '#CBD5E1', fontWeight: 'bold', fontSize: 10, textAlign: 'center' },
   holdActionBtn: {
     flex: 0.7,
-    height: 56,
+    height: 52,
     backgroundColor: '#1D4ED8',
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  holdActionText: {
-    color: '#FFFFFF',
-    fontWeight: 'bold',
-    fontSize: 12,
-    textAlign: 'center',
-  },
+  holdActionText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 11, textAlign: 'center' },
   voidActionBtn: {
     flex: 0.6,
-    height: 56,
+    height: 52,
     backgroundColor: '#DC2626',
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  voidActionText: {
-    color: '#FFFFFF',
-    fontWeight: 'bold',
-    fontSize: 13,
-  },
+  voidActionText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 12 },
   payBtn: {
     flex: 1.5,
-    height: 56,
+    height: 52,
     backgroundColor: '#10B981',
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  payBtnLabel: {
-    color: '#FFFFFF',
-    fontWeight: 'bold',
-    fontSize: 14,
-  },
-  payBtnAmount: {
-    color: '#FFFFFF',
-    fontWeight: 'bold',
-    fontSize: 18,
-  },
-  disabledBtn: {
-    backgroundColor: '#334155',
-    opacity: 0.6,
-  },
+  payBtnLabel: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 13 },
+  payBtnAmount: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 16 },
+  disabledBtn: { backgroundColor: '#334155', opacity: 0.6 },
 });

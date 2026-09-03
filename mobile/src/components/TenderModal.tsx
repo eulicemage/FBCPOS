@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   StyleSheet,
   View,
@@ -10,6 +10,7 @@ import {
   Alert,
 } from 'react-native';
 import { useCartStore } from '../store/cartStore';
+import { useMemberStore, Member } from '../store/memberStore';
 import { DiscountType } from '../../../shared/src';
 import {
   TenderEntry,
@@ -23,7 +24,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 // ─── Types ────────────────────────────────────────
 
-type PaymentTab = 'CASH' | 'CARD' | 'GCASH' | 'MAYA' | 'SPLIT';
+type PaymentTab = 'CASH' | 'POINTS' | 'CARD' | 'GCASH' | 'MAYA';
 
 interface TenderModalProps {
   visible: boolean;
@@ -32,7 +33,7 @@ interface TenderModalProps {
 }
 
 const CASH_DENOMINATIONS = [
-  { label: 'EXACT', value: 0 }, // Special: uses totalDue
+  { label: 'EXACT', value: 0 },
   { label: '₱20', value: 20 },
   { label: '₱50', value: 50 },
   { label: '₱100', value: 100 },
@@ -64,9 +65,16 @@ export const TenderModal: React.FC<TenderModalProps> = ({
     getTotalAmount,
   } = useCartStore();
 
+  const { members, findMemberByBarcode, deductPoints } = useMemberStore();
+
   const [activeTab, setActiveTab] = useState<PaymentTab>('CASH');
   const [cashTendered, setCashTendered] = useState<number>(0);
   const [customAmount, setCustomAmount] = useState('');
+
+  // Points & Member state
+  const [scannedMemberBarcode, setScannedMemberBarcode] = useState('');
+  const [activeMember, setActiveMember] = useState<Member | null>(null);
+  const [splitCashRemainder, setSplitCashRemainder] = useState<number>(0);
 
   // Card fields
   const [cardBrand, setCardBrand] = useState('Visa');
@@ -78,13 +86,33 @@ export const TenderModal: React.FC<TenderModalProps> = ({
 
   const totalDue = getTotalAmount();
 
+  // On modal show, if customerName matches a member, auto-link
+  useEffect(() => {
+    if (visible) {
+      setCashTendered(0);
+      setCustomAmount('');
+      if (customerName) {
+        const found = members.find(
+          (m) => m.fullName.toLowerCase() === customerName.toLowerCase()
+        );
+        if (found) {
+          setActiveMember(found);
+          setScannedMemberBarcode(found.barcode);
+        }
+      } else {
+        // Default to first member for quick testing
+        setActiveMember(members[0]);
+        setScannedMemberBarcode(members[0]?.barcode || '');
+      }
+    }
+  }, [visible, customerName, members]);
+
   const changeAmount = useMemo(() => {
     return Math.max(0, cashTendered - totalDue);
   }, [cashTendered, totalDue]);
 
   const handleDenomination = (value: number) => {
     if (value === 0) {
-      // EXACT
       setCashTendered(totalDue);
     } else {
       setCashTendered(value);
@@ -100,48 +128,99 @@ export const TenderModal: React.FC<TenderModalProps> = ({
     }
   };
 
+  const handleMemberBarcodeSearch = (code: string) => {
+    setScannedMemberBarcode(code);
+    const found = findMemberByBarcode(code);
+    if (found) {
+      setActiveMember(found);
+    }
+  };
+
   const buildPayments = (): TenderEntry[] => {
     switch (activeTab) {
       case 'CASH':
-        return [{
-          id: uuidv4(),
-          method: 'CASH' as PaymentMethod,
-          amount: totalDue,
-          amountTendered: cashTendered,
-          changeAmount: Math.max(0, cashTendered - totalDue),
-        }];
+        return [
+          {
+            id: uuidv4(),
+            method: 'CASH',
+            amount: totalDue,
+            amountTendered: cashTendered,
+            changeAmount: Math.max(0, cashTendered - totalDue),
+          },
+        ];
+
+      case 'POINTS': {
+        if (!activeMember) return [];
+        const available = activeMember.currentPointsBalance;
+        const pointsToPay = Math.min(available, totalDue);
+        const remainder = Math.round((totalDue - pointsToPay) * 100) / 100;
+        const newBal = Math.round((available - pointsToPay) * 100) / 100;
+
+        const paymentsList: TenderEntry[] = [
+          {
+            id: uuidv4(),
+            method: 'POINTS',
+            amount: pointsToPay,
+            amountTendered: pointsToPay,
+            changeAmount: 0,
+            referenceNumber: `CARD-${activeMember.barcode}`,
+            memberBarcode: activeMember.barcode,
+            memberPointsBalance: newBal,
+          },
+        ];
+
+        // If split tender needed because points balance < total due
+        if (remainder > 0) {
+          paymentsList.push({
+            id: uuidv4(),
+            method: 'CASH',
+            amount: remainder,
+            amountTendered: remainder,
+            changeAmount: 0,
+            referenceNumber: 'SPLIT-CASH',
+          });
+        }
+
+        return paymentsList;
+      }
 
       case 'CARD':
-        return [{
-          id: uuidv4(),
-          method: 'CARD' as PaymentMethod,
-          amount: totalDue,
-          amountTendered: totalDue,
-          changeAmount: 0,
-          referenceNumber: cardRefCode,
-          cardBrand,
-          cardLastFour,
-        }];
+        return [
+          {
+            id: uuidv4(),
+            method: 'CARD',
+            amount: totalDue,
+            amountTendered: totalDue,
+            changeAmount: 0,
+            referenceNumber: cardRefCode,
+            cardBrand,
+            cardLastFour,
+          },
+        ];
 
       case 'GCASH':
-        return [{
-          id: uuidv4(),
-          method: 'EWALLET_GCASH' as PaymentMethod,
-          amount: totalDue,
-          amountTendered: totalDue,
-          changeAmount: 0,
-          referenceNumber: ewalletRef,
-        }];
+        return [
+          {
+            id: uuidv4(),
+            method: 'EWALLET_GCASH',
+            amount: totalDue,
+            amountTendered: totalDue,
+            changeAmount: 0,
+            referenceNumber: ewalletRef,
+          },
+        ];
 
       case 'MAYA':
-        return [{
-          id: uuidv4(),
-          method: 'EWALLET_MAYA' as PaymentMethod,
-          amount: totalDue,
-          amountTendered: totalDue,
-          changeAmount: 0,
-          referenceNumber: ewalletRef,
-        }];
+        return [
+          {
+            id: uuidv4(),
+            method: 'EWALLET_MAYA',
+            amount: totalDue,
+            amountTendered: totalDue,
+            changeAmount: 0,
+            referenceNumber: ewalletRef,
+          },
+        ];
 
       default:
         return [];
@@ -155,6 +234,20 @@ export const TenderModal: React.FC<TenderModalProps> = ({
     if (!validation.isValid) {
       Alert.alert('Payment Error', validation.errors.join('\n'));
       return;
+    }
+
+    // If points tender, deduct from memberStore
+    if (activeTab === 'POINTS') {
+      if (!activeMember) {
+        Alert.alert('Error', 'Please select or scan a valid Member ID card.');
+        return;
+      }
+      const pointsPay = Math.min(activeMember.currentPointsBalance, totalDue);
+      const res = deductPoints(activeMember.id, pointsPay);
+      if (!res.success) {
+        Alert.alert('Points Error', res.error || 'Failed to deduct points.');
+        return;
+      }
     }
 
     const config: CheckoutConfig = {
@@ -177,7 +270,16 @@ export const TenderModal: React.FC<TenderModalProps> = ({
         taxAmount: getTaxAmount(),
         totalAmount: totalDue,
       },
-      { customerName, customerTinId, seniorIdNumber },
+      {
+        customerName: activeTab === 'POINTS' ? activeMember?.fullName : customerName,
+        customerTinId,
+        seniorIdNumber,
+        memberBarcode: activeMember?.barcode,
+        memberPointsBalance:
+          activeTab === 'POINTS' && activeMember
+            ? Math.round((activeMember.currentPointsBalance - Math.min(activeMember.currentPointsBalance, totalDue)) * 100) / 100
+            : undefined,
+      },
       config
     );
 
@@ -192,6 +294,11 @@ export const TenderModal: React.FC<TenderModalProps> = ({
     switch (activeTab) {
       case 'CASH':
         return cashTendered >= totalDue;
+      case 'POINTS':
+        return (
+          activeMember !== null &&
+          activeMember.currentPointsBalance > 0
+        );
       case 'CARD':
         return cardRefCode.length > 0 && cardLastFour.length === 4;
       case 'GCASH':
@@ -200,10 +307,11 @@ export const TenderModal: React.FC<TenderModalProps> = ({
       default:
         return false;
     }
-  }, [activeTab, cashTendered, totalDue, cardRefCode, cardLastFour, ewalletRef]);
+  }, [activeTab, cashTendered, totalDue, activeMember, cardRefCode, cardLastFour, ewalletRef]);
 
   const TABS: { key: PaymentTab; label: string; color: string }[] = [
     { key: 'CASH', label: 'CASH', color: '#10B981' },
+    { key: 'POINTS', label: '🏷 POINTS (ID)', color: '#8B5CF6' },
     { key: 'CARD', label: 'CARD', color: '#6B7280' },
     { key: 'GCASH', label: 'GCASH', color: '#2563EB' },
     { key: 'MAYA', label: 'MAYA', color: '#059669' },
@@ -235,7 +343,7 @@ export const TenderModal: React.FC<TenderModalProps> = ({
             ))}
           </ScrollView>
 
-          {/* Financial Breakdown */}
+          {/* Financials */}
           <View style={styles.financials}>
             <View style={styles.finRow}>
               <Text style={styles.finLabel}>Subtotal</Text>
@@ -277,7 +385,7 @@ export const TenderModal: React.FC<TenderModalProps> = ({
 
         {/* Right Panel: Payment Entry */}
         <View style={styles.rightPanel}>
-          <Text style={styles.rightTitle}>Payment</Text>
+          <Text style={styles.rightTitle}>Payment Tender</Text>
 
           {/* Payment Method Tabs */}
           <View style={styles.tabRow}>
@@ -331,7 +439,7 @@ export const TenderModal: React.FC<TenderModalProps> = ({
 
               <TextInput
                 style={styles.customInput}
-                placeholder="Custom amount..."
+                placeholder="Custom cash amount..."
                 placeholderTextColor="#64748B"
                 keyboardType="numeric"
                 value={customAmount}
@@ -353,6 +461,107 @@ export const TenderModal: React.FC<TenderModalProps> = ({
                   </Text>
                 )}
               </View>
+            </View>
+          )}
+
+          {/* Membership Points Tender */}
+          {activeTab === 'POINTS' && (
+            <View style={styles.paymentBody}>
+              <Text style={styles.fieldLabel}>Scan or Select Member ID Card Barcode</Text>
+              <View style={styles.memberInputRow}>
+                <TextInput
+                  style={[styles.fieldInput, { flex: 1 }]}
+                  placeholder="Type or scan ID barcode (e.g. 990001001)..."
+                  placeholderTextColor="#64748B"
+                  value={scannedMemberBarcode}
+                  onChangeText={handleMemberBarcodeSearch}
+                  keyboardType="numeric"
+                />
+              </View>
+
+              {/* Member Selector Chips */}
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.memberChips}>
+                {members.map((m) => (
+                  <TouchableOpacity
+                    key={m.id}
+                    style={[
+                      styles.memberChip,
+                      activeMember?.id === m.id && styles.memberChipActive,
+                    ]}
+                    onPress={() => {
+                      setActiveMember(m);
+                      setScannedMemberBarcode(m.barcode);
+                    }}
+                  >
+                    <Text
+                      style={[
+                        styles.memberChipText,
+                        activeMember?.id === m.id && styles.memberChipTextActive,
+                      ]}
+                    >
+                      {m.fullName} (₱{m.currentPointsBalance.toFixed(0)})
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+
+              {activeMember ? (
+                <View style={styles.memberInfoCard}>
+                  <View style={styles.memberCardHeader}>
+                    <Text style={styles.cardMemberName}>{activeMember.fullName}</Text>
+                    <Text style={styles.cardMemberId}>ID: {activeMember.barcode}</Text>
+                  </View>
+                  <Text style={styles.cardMemberDept}>{activeMember.department || 'Staff'}</Text>
+
+                  <View style={styles.balanceBreakdown}>
+                    <View style={styles.balanceItem}>
+                      <Text style={styles.balSub}>Monthly Allowance:</Text>
+                      <Text style={styles.balVal}>₱{activeMember.monthlyAllowance.toFixed(2)}</Text>
+                    </View>
+                    <View style={styles.balanceItem}>
+                      <Text style={styles.balSub}>Remaining Consumable:</Text>
+                      <Text style={[styles.balVal, { color: '#8B5CF6', fontSize: 16 }]}>
+                        ₱{activeMember.currentPointsBalance.toFixed(2)}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Deduction calculation */}
+                  <View style={styles.deductBox}>
+                    <View style={styles.deductRow}>
+                      <Text style={styles.deductLabel}>Total Due:</Text>
+                      <Text style={styles.deductVal}>₱{totalDue.toFixed(2)}</Text>
+                    </View>
+                    <View style={styles.deductRow}>
+                      <Text style={styles.deductLabel}>Points to Deduct:</Text>
+                      <Text style={[styles.deductVal, { color: '#10B981' }]}>
+                        -₱{Math.min(activeMember.currentPointsBalance, totalDue).toFixed(2)}
+                      </Text>
+                    </View>
+                    {activeMember.currentPointsBalance < totalDue ? (
+                      <View style={styles.splitWarning}>
+                        <Text style={styles.splitWarningText}>
+                          ⚠ Points insufficient. Remaining ₱{(totalDue - activeMember.currentPointsBalance).toFixed(2)} will be split to Cash.
+                        </Text>
+                      </View>
+                    ) : (
+                      <View style={styles.deductRow}>
+                        <Text style={styles.deductLabel}>New Remaining Balance:</Text>
+                        <Text style={[styles.deductVal, { color: '#8B5CF6' }]}>
+                          ₱{(activeMember.currentPointsBalance - totalDue).toFixed(2)}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+              ) : (
+                <View style={styles.noMemberCard}>
+                  <Text style={styles.noMemberText}>No member selected</Text>
+                  <Text style={styles.noMemberSub}>
+                    Scan member barcode or tap a name above
+                  </Text>
+                </View>
+              )}
             </View>
           )}
 
@@ -432,22 +641,9 @@ export const TenderModal: React.FC<TenderModalProps> = ({
   );
 };
 
-// ─── Styles ───────────────────────────────────────
-
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0F172A',
-    flexDirection: 'row',
-  },
-
-  // Left Panel
-  leftPanel: {
-    flex: 45,
-    borderRightWidth: 1,
-    borderRightColor: '#334155',
-    display: 'flex',
-  },
+  container: { flex: 1, backgroundColor: '#0F172A', flexDirection: 'row' },
+  leftPanel: { flex: 42, borderRightWidth: 1, borderRightColor: '#334155' },
   leftHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -463,59 +659,30 @@ const styles = StyleSheet.create({
     backgroundColor: '#334155',
     borderRadius: 6,
   },
-  backBtnText: {
-    color: '#CBD5E1',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  leftTitle: {
-    color: '#F8FAFC',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  itemsList: {
-    flex: 1,
-    padding: 12,
-  },
+  backBtnText: { color: '#CBD5E1', fontSize: 13, fontWeight: '600' },
+  leftTitle: { color: '#F8FAFC', fontSize: 16, fontWeight: 'bold' },
+  itemsList: { flex: 1, padding: 10 },
   summaryItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingVertical: 6,
     borderBottomWidth: 1,
     borderBottomColor: '#1E293B',
   },
-  itemName: {
-    color: '#F8FAFC',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  itemDetail: {
-    color: '#94A3B8',
-    fontSize: 11,
-    marginTop: 2,
-  },
-  itemTotal: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-
-  // Financials
+  itemName: { color: '#F8FAFC', fontSize: 12, fontWeight: '600' },
+  itemDetail: { color: '#94A3B8', fontSize: 11, marginTop: 2 },
+  itemTotal: { color: '#FFFFFF', fontSize: 13, fontWeight: 'bold' },
   financials: {
-    padding: 12,
+    padding: 10,
     backgroundColor: '#1E293B',
     borderTopWidth: 1,
     borderTopColor: '#334155',
   },
-  finRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 4,
-  },
-  finLabel: { color: '#94A3B8', fontSize: 12 },
-  finValue: { color: '#F8FAFC', fontSize: 12, fontWeight: '600' },
-  finLabelSm: { color: '#64748B', fontSize: 11 },
-  finValueSm: { color: '#94A3B8', fontSize: 11 },
+  finRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 3 },
+  finLabel: { color: '#94A3B8', fontSize: 11 },
+  finValue: { color: '#F8FAFC', fontSize: 11, fontWeight: '600' },
+  finLabelSm: { color: '#64748B', fontSize: 10 },
+  finValueSm: { color: '#94A3B8', fontSize: 10 },
   discBadge: {
     backgroundColor: '#065F46',
     paddingHorizontal: 6,
@@ -523,64 +690,33 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   discBadgeText: { color: '#6EE7B7', fontSize: 9, fontWeight: 'bold' },
-  totalRow: {
-    borderTopWidth: 1,
-    borderTopColor: '#334155',
-    marginTop: 6,
-    paddingTop: 8,
-  },
-  totalLabel: { color: '#F8FAFC', fontSize: 16, fontWeight: 'bold' },
-  totalValue: { color: '#10B981', fontSize: 24, fontWeight: 'bold' },
-
-  // Right Panel
-  rightPanel: {
-    flex: 55,
-    padding: 16,
-    display: 'flex',
-  },
+  totalRow: { borderTopWidth: 1, borderTopColor: '#334155', marginTop: 4, paddingTop: 6 },
+  totalLabel: { color: '#F8FAFC', fontSize: 14, fontWeight: 'bold' },
+  totalValue: { color: '#10B981', fontSize: 20, fontWeight: 'bold' },
+  rightPanel: { flex: 58, padding: 14 },
   rightTitle: {
     color: '#F8FAFC',
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: 'bold',
-    marginBottom: 12,
+    marginBottom: 10,
     textAlign: 'center',
   },
-  tabRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 16,
-    justifyContent: 'center',
-  },
+  tabRow: { flexDirection: 'row', gap: 6, marginBottom: 12, justifyContent: 'center' },
   tabBtn: {
-    paddingHorizontal: 18,
+    paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 8,
     backgroundColor: '#1E293B',
     borderWidth: 1,
     borderColor: '#334155',
   },
-  tabBtnText: {
-    color: '#94A3B8',
-    fontSize: 13,
-    fontWeight: 'bold',
-  },
-  tabBtnTextActive: {
-    color: '#FFFFFF',
-  },
-
-  // Payment Body
-  paymentBody: {
-    flex: 1,
-  },
-  denomGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 12,
-  },
+  tabBtnText: { color: '#94A3B8', fontSize: 12, fontWeight: 'bold' },
+  tabBtnTextActive: { color: '#FFFFFF' },
+  paymentBody: { flex: 1 },
+  denomGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 10 },
   denomBtn: {
     width: '23%',
-    height: 56,
+    height: 52,
     backgroundColor: '#1E293B',
     borderRadius: 8,
     borderWidth: 1,
@@ -588,117 +724,115 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  denomBtnActive: {
-    backgroundColor: '#0284C7',
-    borderColor: '#38BDF8',
-  },
-  denomBtnText: {
-    color: '#CBD5E1',
-    fontSize: 15,
-    fontWeight: 'bold',
-  },
-  denomBtnTextActive: {
-    color: '#FFFFFF',
-  },
+  denomBtnActive: { backgroundColor: '#0284C7', borderColor: '#38BDF8' },
+  denomBtnText: { color: '#CBD5E1', fontSize: 14, fontWeight: 'bold' },
+  denomBtnTextActive: { color: '#FFFFFF' },
   customInput: {
     backgroundColor: '#1E293B',
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#334155',
-    padding: 12,
+    padding: 10,
     color: '#FFFFFF',
-    fontSize: 16,
-    marginBottom: 12,
+    fontSize: 15,
+    marginBottom: 8,
   },
-  tenderDisplay: {
-    alignItems: 'center',
-    padding: 16,
-  },
-  tenderedLabel: {
-    color: '#94A3B8',
-    fontSize: 16,
-  },
-  tenderedAmount: {
-    color: '#FFFFFF',
-    fontWeight: 'bold',
-    fontSize: 20,
-  },
-  changeText: {
-    color: '#10B981',
-    fontSize: 28,
-    fontWeight: 'bold',
-    marginTop: 8,
-  },
-  shortText: {
-    color: '#EF4444',
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginTop: 8,
-  },
-
-  // Card / E-wallet fields
-  fieldLabel: {
-    color: '#94A3B8',
-    fontSize: 12,
-    marginBottom: 6,
-    marginTop: 12,
-  },
+  tenderDisplay: { alignItems: 'center', padding: 10 },
+  tenderedLabel: { color: '#94A3B8', fontSize: 14 },
+  tenderedAmount: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 18 },
+  changeText: { color: '#10B981', fontSize: 24, fontWeight: 'bold', marginTop: 4 },
+  shortText: { color: '#EF4444', fontSize: 16, fontWeight: 'bold', marginTop: 4 },
+  fieldLabel: { color: '#94A3B8', fontSize: 12, marginBottom: 4, marginTop: 6 },
   fieldInput: {
     backgroundColor: '#1E293B',
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#334155',
-    padding: 12,
+    padding: 10,
     color: '#FFFFFF',
-    fontSize: 14,
+    fontSize: 13,
   },
-  brandRow: {
+  memberInputRow: { flexDirection: 'row', marginBottom: 6 },
+  memberChips: { maxHeight: 36, marginBottom: 8 },
+  memberChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: '#1E293B',
+    borderWidth: 1,
+    borderColor: '#334155',
+    marginRight: 6,
+  },
+  memberChipActive: { backgroundColor: '#8B5CF6', borderColor: '#C4B5FD' },
+  memberChipText: { color: '#94A3B8', fontSize: 11, fontWeight: '600' },
+  memberChipTextActive: { color: '#FFFFFF', fontWeight: 'bold' },
+  memberInfoCard: {
+    backgroundColor: '#0F172A',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#8B5CF6',
+    padding: 12,
+    marginTop: 4,
+  },
+  memberCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  cardMemberName: { color: '#FFFFFF', fontSize: 15, fontWeight: 'bold' },
+  cardMemberId: { color: '#C4B5FD', fontSize: 12, fontWeight: '600' },
+  cardMemberDept: { color: '#64748B', fontSize: 11, marginTop: 2 },
+  balanceBreakdown: {
     flexDirection: 'row',
-    gap: 8,
+    justifyContent: 'space-between',
+    marginTop: 10,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#1E293B',
   },
+  balanceItem: { alignItems: 'flex-start' },
+  balSub: { color: '#94A3B8', fontSize: 11 },
+  balVal: { color: '#FFFFFF', fontSize: 14, fontWeight: 'bold', marginTop: 2 },
+  deductBox: {
+    backgroundColor: '#1E293B',
+    borderRadius: 6,
+    padding: 8,
+    marginTop: 10,
+    gap: 4,
+  },
+  deductRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  deductLabel: { color: '#94A3B8', fontSize: 12 },
+  deductVal: { color: '#FFFFFF', fontSize: 12, fontWeight: 'bold' },
+  splitWarning: { backgroundColor: '#78350F', padding: 6, borderRadius: 4, marginTop: 4 },
+  splitWarningText: { color: '#FCD34D', fontSize: 11, fontWeight: '600' },
+  noMemberCard: {
+    padding: 30,
+    alignItems: 'center',
+    backgroundColor: '#0F172A',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#334155',
+    marginTop: 10,
+  },
+  noMemberText: { color: '#64748B', fontSize: 14, fontWeight: 'bold' },
+  noMemberSub: { color: '#475569', fontSize: 11, marginTop: 4 },
+  brandRow: { flexDirection: 'row', gap: 6 },
   brandBtn: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: 6,
     backgroundColor: '#1E293B',
     borderWidth: 1,
     borderColor: '#334155',
   },
-  brandBtnActive: {
-    backgroundColor: '#0284C7',
-    borderColor: '#38BDF8',
-  },
-  brandBtnText: {
-    color: '#94A3B8',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  brandBtnTextActive: {
-    color: '#FFFFFF',
-  },
-  cardAmountText: {
-    color: '#94A3B8',
-    fontSize: 16,
-    textAlign: 'center',
-    marginTop: 24,
-  },
-
-  // Confirm Button
+  brandBtnActive: { backgroundColor: '#0284C7', borderColor: '#38BDF8' },
+  brandBtnText: { color: '#94A3B8', fontSize: 12, fontWeight: '600' },
+  brandBtnTextActive: { color: '#FFFFFF' },
+  cardAmountText: { color: '#94A3B8', fontSize: 14, textAlign: 'center', marginTop: 14 },
   confirmBtn: {
-    height: 56,
+    height: 52,
     backgroundColor: '#10B981',
-    borderRadius: 10,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 12,
+    marginTop: 10,
   },
-  confirmBtnDisabled: {
-    backgroundColor: '#334155',
-    opacity: 0.6,
-  },
-  confirmBtnText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
+  confirmBtnDisabled: { backgroundColor: '#334155', opacity: 0.6 },
+  confirmBtnText: { color: '#FFFFFF', fontSize: 15, fontWeight: 'bold' },
 });

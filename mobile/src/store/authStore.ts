@@ -7,10 +7,12 @@ interface AuthState {
   currentTerminal: Terminal | null;
   isAuthenticated: boolean;
   isOnline: boolean;
+  isBypassMode: boolean; // Master bypass mode to unlock all access while cashier is logged in
 
   setAuth: (user: User, branch: Branch, terminal: Terminal) => void;
   logout: () => void;
   setOnlineStatus: (status: boolean) => void;
+  toggleBypassMode: (enabled?: boolean) => void;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -45,6 +47,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
   isAuthenticated: true,
   isOnline: true,
+  isBypassMode: true, // Enabled by default for full developer / cashier access
 
   setAuth: (user, branch, terminal) =>
     set({
@@ -61,4 +64,9 @@ export const useAuthStore = create<AuthState>((set) => ({
     }),
 
   setOnlineStatus: (isOnline: boolean) => set({ isOnline }),
+
+  toggleBypassMode: (enabled?: boolean) =>
+    set((state) => ({
+      isBypassMode: enabled !== undefined ? enabled : !state.isBypassMode,
+    })),
 }));

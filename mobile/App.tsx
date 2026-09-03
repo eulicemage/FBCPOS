@@ -8,6 +8,7 @@ import { ReceiptModal } from './src/components/ReceiptModal';
 import { SaleRecord } from './src/services/checkoutService';
 import { useAuthStore } from './src/store/authStore';
 import { useCartStore } from './src/store/cartStore';
+import { useShiftStore } from './src/store/shiftStore';
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<'POS' | 'INVENTORY' | 'LOGIN'>('POS');
@@ -16,6 +17,8 @@ export default function App() {
   const [lastSale, setLastSale] = useState<SaleRecord | null>(null);
 
   const clearCart = useCartStore((s) => s.clearCart);
+  const { recordSale, startShift, currentShift } = useShiftStore();
+  const { currentUser, isBypassMode } = useAuthStore();
 
   const handleNavigateToCheckout = () => {
     setTenderVisible(true);
@@ -23,6 +26,7 @@ export default function App() {
 
   const handleCheckoutComplete = (sale: SaleRecord) => {
     setTenderVisible(false);
+    recordSale(sale);
     setLastSale(sale);
     setReceiptVisible(true);
   };
@@ -34,13 +38,34 @@ export default function App() {
     setCurrentScreen('POS');
   };
 
+  const handleSwitchCashier = () => {
+    clearCart();
+    setCurrentScreen('LOGIN');
+  };
+
+  const handleLoginSuccess = () => {
+    const cashierName = currentUser?.fullName || 'Incoming Cashier';
+    if (!currentShift || currentShift.status === 'CLOSED') {
+      startShift(cashierName, 2000.0);
+    }
+    setCurrentScreen('POS');
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#0F172A" />
 
       {/* Screen Navigation Bar */}
       <View style={styles.navBar}>
-        <Text style={styles.navBrand}>FBCPOS Tablet v1.0</Text>
+        <View style={styles.brandRow}>
+          <Text style={styles.navBrand}>FBCPOS Tablet v1.0</Text>
+          {isBypassMode && (
+            <View style={styles.bypassIndicator}>
+              <Text style={styles.bypassIndicatorText}>🔓 BYPASS ON</Text>
+            </View>
+          )}
+        </View>
+
         <View style={styles.navTabs}>
           <TouchableOpacity
             style={[styles.tabBtn, currentScreen === 'POS' && styles.tabBtnActive]}
@@ -74,11 +99,14 @@ export default function App() {
       {/* Screen Content */}
       <View style={styles.content}>
         {currentScreen === 'POS' && (
-          <POSScreen onNavigateToCheckout={handleNavigateToCheckout} />
+          <POSScreen
+            onNavigateToCheckout={handleNavigateToCheckout}
+            onSwitchCashier={handleSwitchCashier}
+          />
         )}
         {currentScreen === 'INVENTORY' && <InventoryScreen />}
         {currentScreen === 'LOGIN' && (
-          <LoginScreen onLoginSuccess={() => setCurrentScreen('POS')} />
+          <LoginScreen onLoginSuccess={handleLoginSuccess} />
         )}
       </View>
 
@@ -113,9 +141,27 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#1E293B',
   },
+  brandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
   navBrand: {
     color: '#38BDF8',
     fontSize: 14,
+    fontWeight: 'bold',
+  },
+  bypassIndicator: {
+    backgroundColor: '#78350F',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#F59E0B',
+  },
+  bypassIndicatorText: {
+    color: '#FCD34D',
+    fontSize: 10,
     fontWeight: 'bold',
   },
   navTabs: {
