@@ -81,3 +81,4 @@ export const useSecurityAuditStore = create<SecurityAuditStoreState>((set, get) 
     set({ events: INITIAL_SECURITY_EVENTS });
   },
 }));
+

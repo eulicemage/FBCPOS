@@ -32,3 +32,4 @@ describe('SecurityAuditStore', () => {
     expect(events[0].eventType).toBe('BYPASS_DEACTIVATED');
   });
 });
+
