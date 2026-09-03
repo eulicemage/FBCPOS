@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Text, SafeAreaView, StatusBar, TouchableOpacity } from 'react-native';
+import { StyleSheet, View, Text, SafeAreaView, StatusBar, TouchableOpacity, Alert } from 'react-native';
 import { POSScreen } from './src/screens/POSScreen';
 import { LoginScreen } from './src/screens/LoginScreen';
 import { InventoryScreen } from './src/screens/InventoryScreen';
@@ -13,6 +13,7 @@ import { useReturnStore } from './src/services/returnService';
 import { useInventoryStore } from './src/store/inventoryStore';
 import { useSyncQueueStore } from './src/store/syncQueueStore';
 import { SyncService } from './src/services/syncService';
+import { DraftCartService } from './src/services/draftCartService';
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<'POS' | 'INVENTORY' | 'LOGIN'>('POS');
@@ -21,14 +22,45 @@ export default function App() {
   const [lastSale, setLastSale] = useState<SaleRecord | null>(null);
 
   const clearCart = useCartStore((s) => s.clearCart);
+  const loadCart = useCartStore((s) => s.loadCart);
   const { recordSale, startShift, currentShift } = useShiftStore();
   const { currentUser, isBypassMode } = useAuthStore();
 
-  // Start background auto-sync loop
+  // Start background auto-sync loop & check for crash recovery draft
   React.useEffect(() => {
     SyncService.startAutoSync(15000);
+
+    const pendingDraft = DraftCartService.getPendingDraft();
+    if (pendingDraft && pendingDraft.items.length > 0) {
+      Alert.alert(
+        'Unfinished Sale Detected',
+        `A previous transaction with ${pendingDraft.itemCount} items (₱${pendingDraft.totalAmount.toFixed(2)}) was interrupted.\nWould you like to recover this ticket?`,
+        [
+          {
+            text: 'Discard',
+            style: 'destructive',
+            onPress: () => DraftCartService.clearDraft(),
+          },
+          {
+            text: 'Recover Ticket',
+            onPress: () => {
+              loadCart(
+                pendingDraft.items,
+                pendingDraft.discountType,
+                pendingDraft.discountValue,
+                pendingDraft.customerName,
+                pendingDraft.customerTinId,
+                pendingDraft.seniorIdNumber
+              );
+              DraftCartService.clearDraft();
+            },
+          },
+        ]
+      );
+    }
+
     return () => SyncService.stopAutoSync();
-  }, []);
+  }, [loadCart]);
 
   const handleNavigateToCheckout = () => {
     setTenderVisible(true);
@@ -63,6 +95,7 @@ export default function App() {
       });
     }
 
+    DraftCartService.clearDraft();
     setLastSale(sale);
     setReceiptVisible(true);
   };
@@ -71,6 +104,7 @@ export default function App() {
     setReceiptVisible(false);
     setLastSale(null);
     clearCart();
+    DraftCartService.clearDraft();
     setCurrentScreen('POS');
   };
 

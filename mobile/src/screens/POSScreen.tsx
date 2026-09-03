@@ -30,6 +30,8 @@ import { HardwareSettingsModal } from '../components/HardwareSettingsModal';
 import { ReturnModal } from '../components/ReturnModal';
 import { BackupModal } from '../components/BackupModal';
 import { SyncStatusModal } from '../components/SyncStatusModal';
+import { SecurityAuditModal } from '../components/SecurityAuditModal';
+import { useSecurityAuditStore } from '../store/securityAuditStore';
 import { useSyncQueueStore } from '../store/syncQueueStore';
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
 
@@ -91,6 +93,7 @@ export const POSScreen: React.FC<POSScreenProps> = ({
   const [returnModalVisible, setReturnModalVisible] = useState(false);
   const [backupModalVisible, setBackupModalVisible] = useState(false);
   const [syncModalVisible, setSyncModalVisible] = useState(false);
+  const [auditModalVisible, setAuditModalVisible] = useState(false);
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
 
   const { isSimulatedOffline, getPendingCount } = useSyncQueueStore();
@@ -190,6 +193,12 @@ export const POSScreen: React.FC<POSScreenProps> = ({
   };
 
   const handleOpenDrawer = async () => {
+    useSecurityAuditStore.getState().logEvent(
+      'MANUAL_DRAWER_KICK',
+      'HIGH',
+      'Manual cash drawer kick executed by cashier',
+      currentUser?.fullName || 'Cashier'
+    );
     const res = await kickCashDrawer();
     Alert.alert('Cash Drawer Opened', `Drawer kick pulse dispatched.`);
   };
@@ -230,6 +239,14 @@ export const POSScreen: React.FC<POSScreenProps> = ({
             style={[styles.bypassBtn, isBypassMode && styles.bypassBtnActive]}
             onPress={() => {
               toggleBypassMode();
+              useSecurityAuditStore.getState().logEvent(
+                !isBypassMode ? 'BYPASS_ACTIVATED' : 'BYPASS_DEACTIVATED',
+                'MEDIUM',
+                !isBypassMode
+                  ? 'Master Bypass Mode enabled: security overrides unlocked'
+                  : 'Master Bypass Mode disabled: security re-engaged',
+                currentUser?.fullName || 'Cashier'
+              );
               Alert.alert(
                 'Master Bypass Mode',
                 !isBypassMode
@@ -317,6 +334,13 @@ export const POSScreen: React.FC<POSScreenProps> = ({
             onPress={() => setBackupModalVisible(true)}
           >
             <Text style={styles.headerActionText}>💾 Backup</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.headerActionBtn}
+            onPress={() => setAuditModalVisible(true)}
+          >
+            <Text style={styles.headerActionText}>🛡 Audit</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -654,6 +678,11 @@ export const POSScreen: React.FC<POSScreenProps> = ({
       <SyncStatusModal
         visible={syncModalVisible}
         onClose={() => setSyncModalVisible(false)}
+      />
+
+      <SecurityAuditModal
+        visible={auditModalVisible}
+        onClose={() => setAuditModalVisible(false)}
       />
 
       <SupervisorPinModal

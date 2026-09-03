@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import { CartItem, Product, DiscountType } from '../../../shared/src';
 import { calculateLineItem, roundTo2Decimals } from '../../../shared/src/calculations';
 
+export type { CartItem };
+
 interface CartState {
   items: CartItem[];
   discountType: DiscountType;
@@ -18,7 +20,7 @@ interface CartState {
   applyDiscount: (type: DiscountType, value: number) => void;
   applySeniorDiscount: (seniorId: string, customerName: string) => void;
   setCustomerInfo: (name?: string, tinId?: string, notes?: string) => void;
-  loadCart: (items: CartItem[], discountType: DiscountType, discountValue: number, customerName?: string, customerTinId?: string) => void;
+  loadCart: (items: CartItem[], discountType: DiscountType, discountValue: number, customerName?: string, customerTinId?: string, seniorIdNumber?: string) => void;
   clearCart: () => void;
 
   // Computed Totals & Tax Breakdown
@@ -183,13 +185,21 @@ export const useCartStore = create<CartState>((set, get) => ({
     });
   },
 
-  loadCart: (items: CartItem[], discountType: DiscountType, discountValue: number, customerName?: string, customerTinId?: string) => {
+  loadCart: (
+    items: CartItem[],
+    discountType: DiscountType,
+    discountValue: number,
+    customerName?: string,
+    customerTinId?: string,
+    seniorIdNumber?: string
+  ) => {
     set({
       items,
       discountType,
       discountValue,
       customerName,
       customerTinId,
+      seniorIdNumber,
     });
   },
 
