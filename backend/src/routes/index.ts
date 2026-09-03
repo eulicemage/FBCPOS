@@ -6,6 +6,7 @@ import { inventoryRouter } from './inventoryRoutes';
 import { userRouter } from './userRoutes';
 import { excelRouter } from './excelRoutes';
 import { categoryRouter } from './categoryRoutes';
+import { saleRouter } from './saleRoutes';
 
 export const apiRouter = Router();
 
@@ -16,6 +17,7 @@ apiRouter.use('/sync', syncRouter);
 apiRouter.use('/inventory', inventoryRouter);
 apiRouter.use('/users', userRouter);
 apiRouter.use('/excel', excelRouter);
+apiRouter.use('/sales', saleRouter);
 
 apiRouter.get('/health', (req, res) => {
   res.json({

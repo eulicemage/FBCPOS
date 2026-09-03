@@ -470,18 +470,39 @@ export const POSScreen: React.FC<POSScreenProps> = ({ onNavigateToCheckout }) =>
             </View>
           </View>
 
-          {/* Action Row */}
+          {/* Action Bar — Professional POS Layout */}
           <View style={styles.cartActions}>
             <TouchableOpacity
               style={styles.discountActionBtn}
               onPress={() => setDiscountModalVisible(true)}
               disabled={items.length === 0}
             >
-              <Text style={styles.discountActionText}>% Discount (F3)</Text>
+              <Text style={styles.discountActionText}>% Discount{'\n'}(F3)</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.checkoutBtn, items.length === 0 && styles.disabledBtn]}
+              style={styles.holdActionBtn}
+              onPress={handleHoldSale}
+              disabled={items.length === 0}
+            >
+              <Text style={styles.holdActionText}>HOLD{'\n'}(F4)</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.voidActionBtn, items.length === 0 && styles.disabledBtn]}
+              disabled={items.length === 0}
+              onPress={() => {
+                Alert.alert('Void Sale', 'Clear the entire cart?', [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Void', style: 'destructive', onPress: clearCart },
+                ]);
+              }}
+            >
+              <Text style={styles.voidActionText}>VOID</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.payBtn, items.length === 0 && styles.disabledBtn]}
               disabled={items.length === 0}
               onPress={() => {
                 if (onNavigateToCheckout) {
@@ -494,7 +515,8 @@ export const POSScreen: React.FC<POSScreenProps> = ({ onNavigateToCheckout }) =>
                 }
               }}
             >
-              <Text style={styles.checkoutBtnText}>PROCEED TO CHECKOUT (F12)</Text>
+              <Text style={styles.payBtnLabel}>PAY</Text>
+              <Text style={styles.payBtnAmount}>₱{getTotalAmount().toFixed(2)}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -918,13 +940,13 @@ const styles = StyleSheet.create({
   },
   cartActions: {
     flexDirection: 'row',
-    padding: 10,
+    padding: 8,
     backgroundColor: '#0F172A',
-    gap: 8,
+    gap: 6,
   },
   discountActionBtn: {
-    flex: 1,
-    height: 48,
+    flex: 0.8,
+    height: 56,
     backgroundColor: '#1E293B',
     borderRadius: 8,
     alignItems: 'center',
@@ -935,20 +957,53 @@ const styles = StyleSheet.create({
   discountActionText: {
     color: '#CBD5E1',
     fontWeight: 'bold',
-    fontSize: 12,
+    fontSize: 11,
+    textAlign: 'center',
   },
-  checkoutBtn: {
-    flex: 2,
-    height: 48,
+  holdActionBtn: {
+    flex: 0.7,
+    height: 56,
+    backgroundColor: '#1D4ED8',
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  holdActionText: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    fontSize: 12,
+    textAlign: 'center',
+  },
+  voidActionBtn: {
+    flex: 0.6,
+    height: 56,
+    backgroundColor: '#DC2626',
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  voidActionText: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    fontSize: 13,
+  },
+  payBtn: {
+    flex: 1.5,
+    height: 56,
     backgroundColor: '#10B981',
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  checkoutBtnText: {
+  payBtnLabel: {
     color: '#FFFFFF',
     fontWeight: 'bold',
-    fontSize: 13,
+    fontSize: 14,
+  },
+  payBtnAmount: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    fontSize: 18,
   },
   disabledBtn: {
     backgroundColor: '#334155',
