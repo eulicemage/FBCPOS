@@ -7,276 +7,351 @@ import {
   TouchableOpacity,
   FlatList,
   Modal,
+  ScrollView,
+  Alert,
 } from 'react-native';
 import { useAuthStore } from '../store/authStore';
-
-interface InventoryItem {
-  id: string;
-  productId: string;
-  sku: string;
-  barcode: string;
-  name: string;
-  category: string;
-  stockQuantity: number;
-  reorderLevel: number;
-  unitOfMeasure: string;
-}
-
-const SAMPLE_INVENTORY: InventoryItem[] = [
-  {
-    id: 'inv-1',
-    productId: 'p1',
-    sku: 'BEV-001',
-    barcode: '4800016601011',
-    name: 'Fresh Whole Milk 1L',
-    category: 'Beverages',
-    stockQuantity: 42,
-    reorderLevel: 20,
-    unitOfMeasure: 'PCS',
-  },
-  {
-    id: 'inv-2',
-    productId: 'p2',
-    sku: 'BEV-002',
-    barcode: '4800016601028',
-    name: 'Orange Juice 1L Pure',
-    category: 'Beverages',
-    stockQuantity: 8,
-    reorderLevel: 15, // Low stock
-    unitOfMeasure: 'PCS',
-  },
-  {
-    id: 'inv-3',
-    productId: 'p3',
-    sku: 'BAK-001',
-    barcode: '4800026602012',
-    name: 'Whole Wheat Loaf 500g',
-    category: 'Bakery',
-    stockQuantity: 0, // Out of stock
-    reorderLevel: 10,
-    unitOfMeasure: 'PACK',
-  },
-  {
-    id: 'inv-4',
-    productId: 'p4',
-    sku: 'DAI-001',
-    barcode: '4800036603013',
-    name: 'Organic Brown Eggs 12s',
-    category: 'Dairy & Eggs',
-    stockQuantity: 25,
-    reorderLevel: 10,
-    unitOfMeasure: 'TRAY',
-  },
-  {
-    id: 'inv-5',
-    productId: 'p5',
-    sku: 'CAN-001',
-    barcode: '4800046604014',
-    name: 'Canned Tuna Flakes 180g',
-    category: 'Canned Goods',
-    stockQuantity: 150,
-    reorderLevel: 30,
-    unitOfMeasure: 'CAN',
-  },
-];
+import { useProductStore } from '../store/productStore';
+import { useInventoryStore, StockMovementType } from '../store/inventoryStore';
 
 export const InventoryScreen: React.FC = () => {
-  const { currentBranch } = useAuthStore();
-  const [inventory, setInventory] = useState<InventoryItem[]>(SAMPLE_INVENTORY);
+  const { currentBranch, currentUser } = useAuthStore();
+  const { products, categories } = useProductStore();
+  const { getStockQuantity, recordMovement, movements } = useInventoryStore();
+
+  const [activeTab, setActiveTab] = useState<'STOCKS' | 'LEDGER'>('STOCKS');
   const [search, setSearch] = useState('');
-  const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
+  const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
   const [adjustModalVisible, setAdjustModalVisible] = useState(false);
-  const [adjType, setAdjType] = useState<'STOCK_IN' | 'DAMAGE' | 'AUDIT'>('STOCK_IN');
+  const [adjType, setAdjType] = useState<StockMovementType>('STOCK_IN');
   const [adjQuantity, setAdjQuantity] = useState('');
   const [adjReason, setAdjReason] = useState('');
 
-  const filtered = inventory.filter(
+  // Combine products with reactive inventory quantities
+  const inventoryItems = products.map((p) => {
+    const categoryName =
+      categories.find((c) => c.id === p.categoryId)?.name || 'General';
+    const currentQty = getStockQuantity(p.id);
+    const reorderLevel = 10;
+    return {
+      id: p.id,
+      productId: p.id,
+      sku: p.sku,
+      barcode: p.barcode,
+      name: p.name,
+      category: categoryName,
+      stockQuantity: currentQty,
+      reorderLevel,
+      unitOfMeasure: p.unitOfMeasure,
+    };
+  });
+
+  const filteredItems = inventoryItems.filter(
     (item) =>
       item.name.toLowerCase().includes(search.toLowerCase()) ||
       item.barcode.includes(search) ||
       item.sku.toLowerCase().includes(search.toLowerCase())
   );
 
-  const handleOpenAdjust = (item: InventoryItem) => {
-    setSelectedItem(item);
+  const filteredMovements = movements.filter(
+    (m) =>
+      m.productName.toLowerCase().includes(search.toLowerCase()) ||
+      m.reason?.toLowerCase().includes(search.toLowerCase()) ||
+      m.referenceId?.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const handleOpenAdjust = (item: any) => {
+    setSelectedProduct(item);
     setAdjQuantity('');
     setAdjReason('');
+    setAdjType('STOCK_IN');
     setAdjustModalVisible(true);
   };
 
   const handleSaveAdjustment = () => {
-    if (!selectedItem || !adjQuantity.trim()) return;
+    if (!selectedProduct || !adjQuantity.trim()) return;
 
     const qty = parseFloat(adjQuantity);
     if (isNaN(qty) || qty <= 0) {
-      alert('Please enter a valid positive quantity');
+      Alert.alert('Validation Error', 'Please enter a valid positive quantity.');
       return;
     }
 
-    let newQty = selectedItem.stockQuantity;
-    if (adjType === 'STOCK_IN') {
-      newQty += qty;
-    } else if (adjType === 'DAMAGE') {
-      newQty = Math.max(0, newQty - qty);
-    } else if (adjType === 'AUDIT') {
-      newQty = qty; // Physical count
+    const cashierName = currentUser?.fullName || 'Manager';
+    let qtyChange = qty;
+
+    if (adjType === 'ADJUSTMENT_DAMAGE') {
+      qtyChange = -qty;
+    } else if (adjType === 'ADJUSTMENT_AUDIT') {
+      qtyChange = qty - selectedProduct.stockQuantity;
     }
 
-    setInventory((prev) =>
-      prev.map((i) => (i.id === selectedItem.id ? { ...i, stockQuantity: newQty } : i))
-    );
+    recordMovement({
+      productId: selectedProduct.id,
+      productName: selectedProduct.name,
+      quantityChange: qtyChange,
+      movementType: adjType,
+      reason: adjReason.trim() || 'Manual stock adjustment',
+      performedBy: cashierName,
+    });
 
-    alert(`Inventory updated for ${selectedItem.name}! New Stock: ${newQty}`);
+    Alert.alert(
+      'Stock Adjusted',
+      `Updated ${selectedProduct.name} stock level. Audit record logged.`
+    );
     setAdjustModalVisible(false);
   };
 
   return (
     <View style={styles.container}>
-      {/* Header */}
+      {/* Top Header & Navigation */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.title}>Branch Inventory & Stock Ledger</Text>
-          <Text style={styles.branchSub}>{currentBranch?.name}</Text>
+          <Text style={styles.title}>📦 Branch Inventory & Stock Audit Ledger</Text>
+          <Text style={styles.branchText}>
+            {currentBranch?.name || 'Downtown Hub'} ({currentBranch?.code || '001'})
+          </Text>
         </View>
+
+        {/* Tab Selector */}
+        <View style={styles.tabGroup}>
+          <TouchableOpacity
+            style={[styles.tabBtn, activeTab === 'STOCKS' && styles.tabBtnActive]}
+            onPress={() => setActiveTab('STOCKS')}
+          >
+            <Text
+              style={[styles.tabBtnText, activeTab === 'STOCKS' && styles.tabBtnTextActive]}
+            >
+              📦 Stock Balances ({inventoryItems.length})
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.tabBtn, activeTab === 'LEDGER' && styles.tabBtnActive]}
+            onPress={() => setActiveTab('LEDGER')}
+          >
+            <Text
+              style={[styles.tabBtnText, activeTab === 'LEDGER' && styles.tabBtnTextActive]}
+            >
+              📜 Audit Ledger ({movements.length})
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Search Bar */}
+      <View style={styles.searchContainer}>
         <TextInput
           style={styles.searchInput}
-          placeholder="🔍 Search product, barcode, SKU..."
-          placeholderTextColor="#94A3B8"
+          placeholder={
+            activeTab === 'STOCKS'
+              ? '🔍 Search product name, SKU, barcode...'
+              : '🔍 Filter movements by product, reason, reference...'
+          }
+          placeholderTextColor="#64748B"
           value={search}
           onChangeText={setSearch}
         />
       </View>
 
-      {/* Table Header */}
-      <View style={styles.tableHeader}>
-        <Text style={[styles.th, { flex: 2 }]}>Product / SKU</Text>
-        <Text style={[styles.th, { flex: 1.5 }]}>Barcode</Text>
-        <Text style={[styles.th, { flex: 1 }]}>Category</Text>
-        <Text style={[styles.th, { flex: 1, textAlign: 'center' }]}>In Stock</Text>
-        <Text style={[styles.th, { flex: 1, textAlign: 'center' }]}>Reorder Level</Text>
-        <Text style={[styles.th, { flex: 1, textAlign: 'center' }]}>Status</Text>
-        <Text style={[styles.th, { flex: 1, textAlign: 'center' }]}>Action</Text>
-      </View>
+      {/* Tab: STOCKS */}
+      {activeTab === 'STOCKS' && (
+        <FlatList
+          data={filteredItems}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContent}
+          renderItem={({ item }) => {
+            const isOutOfStock = item.stockQuantity === 0;
+            const isLowStock = !isOutOfStock && item.stockQuantity <= item.reorderLevel;
 
-      {/* Inventory Rows */}
-      <FlatList
-        data={filtered}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => {
-          const isOut = item.stockQuantity <= 0;
-          const isLow = !isOut && item.stockQuantity <= item.reorderLevel;
+            return (
+              <View style={styles.card}>
+                <View style={styles.cardLeft}>
+                  <Text style={styles.name}>{item.name}</Text>
+                  <Text style={styles.sku}>
+                    SKU: {item.sku} • Barcode: {item.barcode}
+                  </Text>
+                  <Text style={styles.category}>Category: {item.category}</Text>
+                </View>
 
-          return (
-            <View style={styles.tableRow}>
-              <View style={{ flex: 2 }}>
-                <Text style={styles.productName}>{item.name}</Text>
-                <Text style={styles.skuText}>{item.sku}</Text>
+                <View style={styles.cardRight}>
+                  <View style={styles.stockBadgeContainer}>
+                    <Text style={styles.stockNumber}>{item.stockQuantity}</Text>
+                    <Text style={styles.uom}>{item.unitOfMeasure}</Text>
+                  </View>
+
+                  {isOutOfStock && (
+                    <View style={[styles.statusBadge, styles.badgeOut]}>
+                      <Text style={styles.badgeText}>OUT OF STOCK</Text>
+                    </View>
+                  )}
+                  {isLowStock && (
+                    <View style={[styles.statusBadge, styles.badgeLow]}>
+                      <Text style={styles.badgeText}>LOW STOCK</Text>
+                    </View>
+                  )}
+                  {!isOutOfStock && !isLowStock && (
+                    <View style={[styles.statusBadge, styles.badgeOk]}>
+                      <Text style={styles.badgeText}>IN STOCK</Text>
+                    </View>
+                  )}
+
+                  <TouchableOpacity
+                    style={styles.adjustBtn}
+                    onPress={() => handleOpenAdjust(item)}
+                  >
+                    <Text style={styles.adjustBtnText}>⚡ Adjust Stock</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
-              <Text style={[styles.td, { flex: 1.5 }]}>{item.barcode}</Text>
-              <Text style={[styles.td, { flex: 1 }]}>{item.category}</Text>
-              <Text
-                style={[
-                  styles.tdBold,
-                  { flex: 1, textAlign: 'center' },
-                  isOut && styles.textRed,
-                  isLow && styles.textYellow,
-                ]}
-              >
-                {item.stockQuantity} {item.unitOfMeasure}
-              </Text>
-              <Text style={[styles.td, { flex: 1, textAlign: 'center' }]}>
-                {item.reorderLevel} {item.unitOfMeasure}
-              </Text>
-              <View style={{ flex: 1, alignItems: 'center' }}>
-                <View
-                  style={[
-                    styles.statusBadge,
-                    isOut
-                      ? styles.badgeRed
-                      : isLow
-                      ? styles.badgeYellow
-                      : styles.badgeGreen,
-                  ]}
-                >
-                  <Text style={styles.statusText}>
-                    {isOut ? 'OUT OF STOCK' : isLow ? 'LOW STOCK' : 'OPTIMAL'}
+            );
+          }}
+        />
+      )}
+
+      {/* Tab: AUDIT LEDGER */}
+      {activeTab === 'LEDGER' && (
+        <FlatList
+          data={filteredMovements}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContent}
+          renderItem={({ item }) => {
+            const isPositive = item.quantityChange > 0;
+            const isNeutral = item.quantityChange === 0;
+
+            return (
+              <View style={styles.movementCard}>
+                <View style={{ flex: 1 }}>
+                  <View style={styles.movHeaderRow}>
+                    <Text style={styles.movProductName}>{item.productName}</Text>
+                    <View
+                      style={[
+                        styles.movTypeBadge,
+                        item.movementType === 'STOCK_IN' && styles.movStockIn,
+                        item.movementType === 'SALE' && styles.movSale,
+                        item.movementType.includes('RETURN') && styles.movReturn,
+                        item.movementType.includes('DAMAGE') && styles.movDamage,
+                      ]}
+                    >
+                      <Text style={styles.movTypeText}>{item.movementType}</Text>
+                    </View>
+                  </View>
+
+                  <Text style={styles.movReason}>{item.reason || 'Inventory Adjustment'}</Text>
+                  <Text style={styles.movMeta}>
+                    {item.createdAt.slice(0, 16).replace('T', ' ')} • By: {item.performedBy}
+                    {item.referenceId ? ` • Ref: ${item.referenceId}` : ''}
+                  </Text>
+                </View>
+
+                <View style={styles.movQtyBox}>
+                  <Text
+                    style={[
+                      styles.movQtyChange,
+                      isPositive && styles.qtyPos,
+                      !isPositive && !isNeutral && styles.qtyNeg,
+                      isNeutral && styles.qtyNeut,
+                    ]}
+                  >
+                    {isPositive ? `+${item.quantityChange}` : `${item.quantityChange}`}
+                  </Text>
+                  <Text style={styles.movBalance}>
+                    Bal: {item.previousQuantity} → {item.newQuantity}
                   </Text>
                 </View>
               </View>
-              <View style={{ flex: 1, alignItems: 'center' }}>
-                <TouchableOpacity
-                  style={styles.adjustBtn}
-                  onPress={() => handleOpenAdjust(item)}
-                >
-                  <Text style={styles.adjustBtnText}>Adjust</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          );
-        }}
-      />
+            );
+          }}
+        />
+      )}
 
       {/* Stock Adjustment Modal */}
-      <Modal visible={adjustModalVisible} transparent animationType="slide">
+      <Modal visible={adjustModalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Stock Adjustment</Text>
-            <Text style={styles.modalSub}>{selectedItem?.name}</Text>
-            <Text style={styles.currentStockText}>
-              Current Stock: {selectedItem?.stockQuantity} {selectedItem?.unitOfMeasure}
-            </Text>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Adjust Stock Quantity</Text>
+            {selectedProduct && (
+              <Text style={styles.modalItemName}>{selectedProduct.name}</Text>
+            )}
 
-            {/* Adjustment Type Selector */}
             <View style={styles.typeSelector}>
-              {(['STOCK_IN', 'DAMAGE', 'AUDIT'] as const).map((t) => (
-                <TouchableOpacity
-                  key={t}
-                  style={[styles.typeBtn, adjType === t && styles.typeBtnActive]}
-                  onPress={() => setAdjType(t)}
+              <TouchableOpacity
+                style={[styles.typeBtn, adjType === 'STOCK_IN' && styles.typeBtnActive]}
+                onPress={() => setAdjType('STOCK_IN')}
+              >
+                <Text
+                  style={[
+                    styles.typeBtnText,
+                    adjType === 'STOCK_IN' && styles.typeBtnTextActive,
+                  ]}
                 >
-                  <Text
-                    style={[styles.typeBtnText, adjType === t && styles.typeBtnTextActive]}
-                  >
-                    {t === 'STOCK_IN'
-                      ? 'Stock In (+)'
-                      : t === 'DAMAGE'
-                      ? 'Damage Write-Off (-)'
-                      : 'Physical Audit (=)'}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+                  ➕ Stock In
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.typeBtn,
+                  adjType === 'ADJUSTMENT_DAMAGE' && styles.typeBtnActive,
+                ]}
+                onPress={() => setAdjType('ADJUSTMENT_DAMAGE')}
+              >
+                <Text
+                  style={[
+                    styles.typeBtnText,
+                    adjType === 'ADJUSTMENT_DAMAGE' && styles.typeBtnTextActive,
+                  ]}
+                >
+                  🗑 Spoil / Damage
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.typeBtn,
+                  adjType === 'ADJUSTMENT_AUDIT' && styles.typeBtnActive,
+                ]}
+                onPress={() => setAdjType('ADJUSTMENT_AUDIT')}
+              >
+                <Text
+                  style={[
+                    styles.typeBtnText,
+                    adjType === 'ADJUSTMENT_AUDIT' && styles.typeBtnTextActive,
+                  ]}
+                >
+                  📝 Audit Count
+                </Text>
+              </TouchableOpacity>
             </View>
 
-            <Text style={styles.inputLabel}>
-              {adjType === 'AUDIT' ? 'Actual Counted Physical Stock' : 'Quantity to Apply'}
-            </Text>
             <TextInput
               style={styles.modalInput}
-              placeholder="Enter quantity..."
+              placeholder="Quantity (e.g. 10)"
               placeholderTextColor="#64748B"
               keyboardType="numeric"
               value={adjQuantity}
               onChangeText={setAdjQuantity}
             />
 
-            <Text style={styles.inputLabel}>Reason / Audit Reference</Text>
             <TextInput
-              style={styles.modalInput}
-              placeholder="e.g. Broken packaging, physical count, supplier delivery..."
+              style={[styles.modalInput, styles.reasonInput]}
+              placeholder="Reason / PO # (e.g., Supplier Delivery, Spoilage, Physical Count)"
               placeholderTextColor="#64748B"
               value={adjReason}
               onChangeText={setAdjReason}
+              multiline
             />
 
-            <View style={styles.modalActionRow}>
+            <View style={styles.modalActions}>
               <TouchableOpacity
                 style={styles.cancelBtn}
                 onPress={() => setAdjustModalVisible(false)}
               >
                 <Text style={styles.cancelBtnText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.confirmBtn} onPress={handleSaveAdjustment}>
-                <Text style={styles.confirmBtnText}>Save Movement</Text>
+
+              <TouchableOpacity style={styles.saveBtn} onPress={handleSaveAdjustment}>
+                <Text style={styles.saveBtnText}>Record & Audit</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -287,152 +362,117 @@ export const InventoryScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0F172A',
-    padding: 16,
-  },
+  container: { flex: 1, backgroundColor: '#0F172A' },
   header: {
+    padding: 16,
+    backgroundColor: '#1E293B',
+    borderBottomWidth: 1,
+    borderBottomColor: '#334155',
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
   },
-  title: {
-    color: '#38BDF8',
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  branchSub: {
-    color: '#94A3B8',
-    fontSize: 13,
-  },
-  searchInput: {
-    width: 320,
-    height: 44,
-    backgroundColor: '#1E293B',
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    color: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#334155',
-  },
-  tableHeader: {
-    flexDirection: 'row',
-    backgroundColor: '#1E293B',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: '#334155',
-  },
-  th: {
-    color: '#94A3B8',
-    fontSize: 12,
-    fontWeight: 'bold',
-    textTransform: 'uppercase',
-  },
-  tableRow: {
-    flexDirection: 'row',
-    backgroundColor: '#1E293B',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    marginBottom: 6,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#334155',
-  },
-  productName: {
-    color: '#F8FAFC',
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  skuText: {
-    color: '#64748B',
-    fontSize: 11,
-  },
-  td: {
-    color: '#CBD5E1',
-    fontSize: 13,
-  },
-  tdBold: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  textRed: {
-    color: '#EF4444',
-  },
-  textYellow: {
-    color: '#F59E0B',
-  },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  badgeGreen: {
-    backgroundColor: '#065F46',
-  },
-  badgeYellow: {
-    backgroundColor: '#78350F',
-  },
-  badgeRed: {
-    backgroundColor: '#7F1D1D',
-  },
-  statusText: {
-    color: '#FFFFFF',
-    fontSize: 10,
-    fontWeight: 'bold',
-  },
-  adjustBtn: {
-    backgroundColor: '#0284C7',
-    paddingHorizontal: 14,
+  title: { fontSize: 17, fontWeight: 'bold', color: '#F8FAFC' },
+  branchText: { fontSize: 12, color: '#94A3B8', marginTop: 2 },
+  tabGroup: { flexDirection: 'row', gap: 6 },
+  tabBtn: {
+    paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 6,
-  },
-  adjustBtnText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalCard: {
-    width: 440,
-    backgroundColor: '#1E293B',
-    borderRadius: 16,
-    padding: 24,
+    backgroundColor: '#0F172A',
     borderWidth: 1,
     borderColor: '#334155',
   },
-  modalTitle: {
-    color: '#38BDF8',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  modalSub: {
+  tabBtnActive: { backgroundColor: '#0284C7', borderColor: '#38BDF8' },
+  tabBtnText: { color: '#94A3B8', fontSize: 12, fontWeight: '600' },
+  tabBtnTextActive: { color: '#FFFFFF', fontWeight: 'bold' },
+  searchContainer: { padding: 12 },
+  searchInput: {
+    backgroundColor: '#1E293B',
+    borderRadius: 8,
+    padding: 10,
     color: '#F8FAFC',
-    fontSize: 15,
-    marginTop: 4,
-    fontWeight: '600',
+    borderWidth: 1,
+    borderColor: '#334155',
   },
-  currentStockText: {
-    color: '#94A3B8',
-    fontSize: 13,
-    marginBottom: 16,
-  },
-  typeSelector: {
+  listContent: { paddingHorizontal: 12, paddingBottom: 24 },
+  card: {
+    backgroundColor: '#1E293B',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 8,
     flexDirection: 'row',
-    gap: 6,
-    marginBottom: 16,
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: '#334155',
   },
+  cardLeft: { flex: 1, justifyContent: 'center' },
+  name: { fontSize: 14, fontWeight: 'bold', color: '#F8FAFC' },
+  sku: { fontSize: 11, color: '#94A3B8', marginTop: 2 },
+  category: { fontSize: 11, color: '#64748B', marginTop: 2 },
+  cardRight: { alignItems: 'flex-end', justifyContent: 'center', gap: 4 },
+  stockBadgeContainer: { flexDirection: 'row', alignItems: 'baseline', gap: 4 },
+  stockNumber: { fontSize: 18, fontWeight: 'bold', color: '#F8FAFC' },
+  uom: { fontSize: 11, color: '#94A3B8' },
+  statusBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+  badgeOut: { backgroundColor: '#7F1D1D' },
+  badgeLow: { backgroundColor: '#78350F' },
+  badgeOk: { backgroundColor: '#065F46' },
+  badgeText: { fontSize: 9, fontWeight: 'bold', color: '#F8FAFC' },
+  adjustBtn: {
+    backgroundColor: '#0284C7',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+    marginTop: 4,
+  },
+  adjustBtnText: { color: '#FFFFFF', fontSize: 11, fontWeight: 'bold' },
+  movementCard: {
+    backgroundColor: '#1E293B',
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 6,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  movHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  movProductName: { color: '#F8FAFC', fontSize: 13, fontWeight: 'bold' },
+  movTypeBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: '#334155' },
+  movStockIn: { backgroundColor: '#065F46' },
+  movSale: { backgroundColor: '#1E3A8A' },
+  movReturn: { backgroundColor: '#4C1D95' },
+  movDamage: { backgroundColor: '#7F1D1D' },
+  movTypeText: { color: '#FFFFFF', fontSize: 9, fontWeight: 'bold' },
+  movReason: { color: '#CBD5E1', fontSize: 11, marginTop: 2 },
+  movMeta: { color: '#64748B', fontSize: 10, marginTop: 2 },
+  movQtyBox: { alignItems: 'flex-end' },
+  movQtyChange: { fontSize: 15, fontWeight: 'bold' },
+  qtyPos: { color: '#10B981' },
+  qtyNeg: { color: '#EF4444' },
+  qtyNeut: { color: '#94A3B8' },
+  movBalance: { color: '#64748B', fontSize: 10, marginTop: 2 },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: '#1E293B',
+    borderRadius: 12,
+    padding: 18,
+    width: '75%',
+    maxWidth: 480,
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  modalTitle: { fontSize: 16, fontWeight: 'bold', color: '#F8FAFC' },
+  modalItemName: { fontSize: 13, color: '#38BDF8', marginTop: 2, marginBottom: 12 },
+  typeSelector: { flexDirection: 'row', gap: 6, marginBottom: 12 },
   typeBtn: {
     flex: 1,
     paddingVertical: 8,
@@ -442,57 +482,23 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#334155',
   },
-  typeBtnActive: {
-    backgroundColor: '#0284C7',
-    borderColor: '#38BDF8',
-  },
-  typeBtnText: {
-    color: '#94A3B8',
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  typeBtnTextActive: {
-    color: '#FFFFFF',
-  },
-  inputLabel: {
-    color: '#CBD5E1',
-    fontSize: 12,
-    marginBottom: 6,
-  },
+  typeBtnActive: { backgroundColor: '#0284C7', borderColor: '#38BDF8' },
+  typeBtnText: { color: '#94A3B8', fontSize: 11, fontWeight: '600' },
+  typeBtnTextActive: { color: '#FFFFFF', fontWeight: 'bold' },
   modalInput: {
-    height: 44,
     backgroundColor: '#0F172A',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    color: '#FFFFFF',
-    fontSize: 14,
+    borderRadius: 6,
+    padding: 10,
+    color: '#F8FAFC',
     borderWidth: 1,
     borderColor: '#334155',
-    marginBottom: 14,
+    marginBottom: 8,
+    fontSize: 13,
   },
-  modalActionRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 12,
-    marginTop: 8,
-  },
-  cancelBtn: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-  },
-  cancelBtnText: {
-    color: '#94A3B8',
-    fontWeight: '600',
-  },
-  confirmBtn: {
-    backgroundColor: '#10B981',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-  },
-  confirmBtnText: {
-    color: '#FFFFFF',
-    fontWeight: 'bold',
-  },
+  reasonInput: { height: 60, textAlignVertical: 'top' },
+  modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 8 },
+  cancelBtn: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6, backgroundColor: '#334155' },
+  cancelBtnText: { color: '#F8FAFC', fontSize: 12, fontWeight: '600' },
+  saveBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 6, backgroundColor: '#10B981' },
+  saveBtnText: { color: '#FFFFFF', fontSize: 12, fontWeight: 'bold' },
 });
-

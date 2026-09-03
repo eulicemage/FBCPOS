@@ -9,6 +9,8 @@ import { SaleRecord } from './src/services/checkoutService';
 import { useAuthStore } from './src/store/authStore';
 import { useCartStore } from './src/store/cartStore';
 import { useShiftStore } from './src/store/shiftStore';
+import { useReturnStore } from './src/services/returnService';
+import { useInventoryStore } from './src/store/inventoryStore';
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<'POS' | 'INVENTORY' | 'LOGIN'>('POS');
@@ -27,6 +29,21 @@ export default function App() {
   const handleCheckoutComplete = (sale: SaleRecord) => {
     setTenderVisible(false);
     recordSale(sale);
+    useReturnStore.getState().archiveSale(sale);
+
+    // Immutable inventory deduction
+    for (const item of sale.items) {
+      useInventoryStore.getState().recordMovement({
+        productId: item.productId,
+        productName: item.productName,
+        quantityChange: -item.quantity,
+        movementType: 'SALE',
+        referenceId: sale.invoiceNumber,
+        reason: 'Point-of-Sale Counter Sale',
+        performedBy: sale.cashierName,
+      });
+    }
+
     setLastSale(sale);
     setReceiptVisible(true);
   };

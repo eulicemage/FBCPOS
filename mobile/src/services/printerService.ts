@@ -102,6 +102,29 @@ export interface ZReadingParams {
   totalVoids: number;
 }
 
+export interface ReturnSlipParams {
+  branchName: string;
+  branchAddress: string;
+  taxId: string;
+  terminalNumber: string;
+  returnNumber: string;
+  originalInvoiceNumber: string;
+  cashierName: string;
+  customerName?: string;
+  memberBarcode?: string;
+  date: string;
+  items: Array<{
+    name: string;
+    quantity: number;
+    unitPrice: number;
+    refundAmount: number;
+    reason: string;
+    disposition: string;
+  }>;
+  totalRefundAmount: number;
+  refundTender: string;
+}
+
 export class ESCPOSBuilder {
   private buffer: number[] = [];
 
@@ -661,6 +684,90 @@ export class PrinterService {
       .bold(true)
       .line('ALL DIAGNOSTICS PASSED')
       .bold(false)
+      .cut(false);
+
+    return builder.build();
+  }
+
+  /**
+   * Generates an official Return Slip / Credit Note receipt (70mm Xprinter, 80mm, 58mm).
+   */
+  static formatReturnSlip(
+    params: ReturnSlipParams,
+    options: PrintFormatOptions = {}
+  ): Uint8Array {
+    const width = options.paperWidth || '70MM';
+    const cols = PrinterService.getColumns(width);
+    const builder = new ESCPOSBuilder();
+
+    builder.init();
+
+    // Kick cash drawer if cash was refunded
+    if (params.refundTender === 'CASH') {
+      builder.kickDrawer(options.drawerPin || 'PIN_2');
+    }
+
+    builder
+      .alignCenter()
+      .bold(true)
+      .doubleSize(true)
+      .line(AppConfig.receiptHeader.companyName)
+      .doubleSize(false)
+      .bold(false)
+      .line(params.branchName)
+      .line(`VAT REG TIN: ${params.taxId}`)
+      .feed(1)
+      .bold(true)
+      .line('OFFICIAL RETURN SLIP')
+      .line('(CREDIT NOTE / REFUND)')
+      .bold(false)
+      .separator('=', cols)
+      .alignLeft()
+      .twoColumn('RETURN #:', params.returnNumber, cols)
+      .twoColumn('ORIG INVOICE:', params.originalInvoiceNumber, cols)
+      .twoColumn('DATE:', params.date, cols)
+      .twoColumn('TERMINAL:', params.terminalNumber, cols)
+      .twoColumn('CASHIER:', params.cashierName, cols);
+
+    if (params.customerName) {
+      builder.twoColumn('CUSTOMER:', params.customerName, cols);
+    }
+    if (params.memberBarcode) {
+      builder.twoColumn('MEMBER ID:', params.memberBarcode, cols);
+    }
+
+    builder
+      .separator('-', cols)
+      .bold(true)
+      .line('RETURNED ITEMS:')
+      .bold(false);
+
+    for (const item of params.items) {
+      builder.line(item.name.substring(0, cols));
+      const sub = `  ${item.quantity} x P${item.unitPrice.toFixed(2)} [${item.disposition}]`;
+      const tot = `-P${item.refundAmount.toFixed(2)}`;
+      builder.twoColumn(sub, tot, cols);
+      builder.line(`  Reason: ${item.reason}`);
+    }
+
+    builder
+      .separator('=', cols)
+      .bold(true)
+      .doubleHeight(true)
+      .twoColumn('TOTAL REFUND:', `P${params.totalRefundAmount.toFixed(2)}`, cols)
+      .doubleHeight(false)
+      .bold(false)
+      .twoColumn('REFUND METHOD:', params.refundTender, cols)
+      .separator('=', cols)
+      .feed(1)
+      .alignCenter()
+      .line('_____________________________')
+      .line('CUSTOMER SIGNATURE')
+      .feed(1)
+      .line('_____________________________')
+      .line('AUTHORIZED SUPERVISOR')
+      .feed(1)
+      .line('GOODS RETURNED / REFUND PROCESSED')
       .cut(false);
 
     return builder.build();

@@ -27,6 +27,8 @@ import { MemberManagementModal } from '../components/MemberManagementModal';
 import { ShiftReadingModal, ReadingType } from '../components/ShiftReadingModal';
 import { ShiftHistoryModal } from '../components/ShiftHistoryModal';
 import { HardwareSettingsModal } from '../components/HardwareSettingsModal';
+import { ReturnModal } from '../components/ReturnModal';
+import { BackupModal } from '../components/BackupModal';
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
 
 interface POSScreenProps {
@@ -84,6 +86,8 @@ export const POSScreen: React.FC<POSScreenProps> = ({
   const [readingType, setReadingType] = useState<ReadingType>('X_READ');
   const [historyModalVisible, setHistoryModalVisible] = useState(false);
   const [hardwareModalVisible, setHardwareModalVisible] = useState(false);
+  const [returnModalVisible, setReturnModalVisible] = useState(false);
+  const [backupModalVisible, setBackupModalVisible] = useState(false);
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
 
   // Hardware Barcode Scanner Hook
@@ -272,6 +276,20 @@ export const POSScreen: React.FC<POSScreenProps> = ({
             onPress={() => setHistoryModalVisible(true)}
           >
             <Text style={styles.headerActionText}>📜 Archive</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.headerActionBtn, styles.returnBtn]}
+            onPress={() => setReturnModalVisible(true)}
+          >
+            <Text style={styles.returnBtnText}>↩ Return (F7)</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.headerActionBtn}
+            onPress={() => setBackupModalVisible(true)}
+          >
+            <Text style={styles.headerActionText}>💾 Backup</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -596,6 +614,16 @@ export const POSScreen: React.FC<POSScreenProps> = ({
         onAddToCart={(p) => addItem(p)}
       />
 
+      <ReturnModal
+        visible={returnModalVisible}
+        onClose={() => setReturnModalVisible(false)}
+      />
+
+      <BackupModal
+        visible={backupModalVisible}
+        onClose={() => setBackupModalVisible(false)}
+      />
+
       <SupervisorPinModal
         visible={supervisorModalVisible}
         actionTitle="Item Void Approval"
@@ -657,6 +685,8 @@ const styles = StyleSheet.create({
   xReadText: { color: '#93C5FD', fontSize: 11, fontWeight: 'bold' },
   zReadBtn: { backgroundColor: '#7F1D1D', borderColor: '#EF4444' },
   zReadText: { color: '#FCA5A5', fontSize: 11, fontWeight: 'bold' },
+  returnBtn: { backgroundColor: '#7C2D12', borderColor: '#EA580C' },
+  returnBtnText: { color: '#FFEDD5', fontSize: 11, fontWeight: 'bold' },
   drawerBtn: {
     backgroundColor: '#047857',
     paddingHorizontal: 10,

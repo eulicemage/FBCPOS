@@ -126,4 +126,36 @@ describe('ESC/POS Printer Service', () => {
     expect(kickPin2[3]).toBe(0x70); // Kick
     expect(kickPin2[4]).toBe(0x00); // Pin 2
   });
+
+  it('generates official Return Slip / Credit Note', () => {
+    const returnSlip = PrinterService.formatReturnSlip(
+      {
+        branchName: 'Branch 001 - Downtown Flagship',
+        branchAddress: '123 Rizal Ave, Manila',
+        taxId: '100-001-000-000',
+        terminalNumber: 'T1',
+        returnNumber: 'RET-001-T1-20260903-0001',
+        originalInvoiceNumber: 'BR-001-T1-20260903-0042',
+        cashierName: 'Maria Santos',
+        customerName: 'Juan Dela Cruz',
+        date: '2026-09-03 14:30:00',
+        items: [
+          {
+            name: 'Fresh Whole Milk 1L',
+            quantity: 1,
+            unitPrice: 95.0,
+            refundAmount: 95.0,
+            reason: 'DEFECTIVE_EXPIRED',
+            disposition: 'SCRAP_WASTE',
+          },
+        ],
+        totalRefundAmount: 95.0,
+        refundTender: 'CASH',
+      },
+      { paperWidth: '70MM' }
+    );
+
+    expect(returnSlip).toBeInstanceOf(Uint8Array);
+    expect(returnSlip.length).toBeGreaterThan(150);
+  });
 });
