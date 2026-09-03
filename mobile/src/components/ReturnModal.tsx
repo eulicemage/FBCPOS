@@ -682,3 +682,4 @@ const styles = StyleSheet.create({
   confirmBtnDisabled: { backgroundColor: '#334155', opacity: 0.5 },
   confirmBtnText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 13 },
 });
+

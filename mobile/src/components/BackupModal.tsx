@@ -294,3 +294,4 @@ const styles = StyleSheet.create({
   },
   closeFooterBtnText: { color: '#CBD5E1', fontSize: 12, fontWeight: '600' },
 });
+

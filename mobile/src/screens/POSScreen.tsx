@@ -29,6 +29,8 @@ import { ShiftHistoryModal } from '../components/ShiftHistoryModal';
 import { HardwareSettingsModal } from '../components/HardwareSettingsModal';
 import { ReturnModal } from '../components/ReturnModal';
 import { BackupModal } from '../components/BackupModal';
+import { SyncStatusModal } from '../components/SyncStatusModal';
+import { useSyncQueueStore } from '../store/syncQueueStore';
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
 
 interface POSScreenProps {
@@ -88,7 +90,11 @@ export const POSScreen: React.FC<POSScreenProps> = ({
   const [hardwareModalVisible, setHardwareModalVisible] = useState(false);
   const [returnModalVisible, setReturnModalVisible] = useState(false);
   const [backupModalVisible, setBackupModalVisible] = useState(false);
+  const [syncModalVisible, setSyncModalVisible] = useState(false);
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
+
+  const { isSimulatedOffline, getPendingCount } = useSyncQueueStore();
+  const pendingSyncCount = getPendingCount();
 
   // Hardware Barcode Scanner Hook
   const { handleKeyPress } = useBarcodeScanner({
@@ -234,6 +240,27 @@ export const POSScreen: React.FC<POSScreenProps> = ({
           >
             <Text style={[styles.bypassText, isBypassMode && styles.bypassTextActive]}>
               {isBypassMode ? '🔓 BYPASS ACTIVE' : '🔒 BYPASS (F10)'}
+            </Text>
+          </TouchableOpacity>
+
+          {/* Cloud Sync Status Badge */}
+          <TouchableOpacity
+            style={[
+              styles.syncBadge,
+              isSimulatedOffline || !isOnline
+                ? styles.syncBadgeOffline
+                : pendingSyncCount > 0
+                ? styles.syncBadgePending
+                : styles.syncBadgeSynced,
+            ]}
+            onPress={() => setSyncModalVisible(true)}
+          >
+            <Text style={styles.syncBadgeText}>
+              {isSimulatedOffline || !isOnline
+                ? '🔴 OFFLINE'
+                : pendingSyncCount > 0
+                ? `🟡 SYNC (${pendingSyncCount})`
+                : '🟢 SYNCED'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -624,6 +651,11 @@ export const POSScreen: React.FC<POSScreenProps> = ({
         onClose={() => setBackupModalVisible(false)}
       />
 
+      <SyncStatusModal
+        visible={syncModalVisible}
+        onClose={() => setSyncModalVisible(false)}
+      />
+
       <SupervisorPinModal
         visible={supervisorModalVisible}
         actionTitle="Item Void Approval"
@@ -667,6 +699,16 @@ const styles = StyleSheet.create({
   },
   bypassText: { color: '#94A3B8', fontSize: 11, fontWeight: 'bold' },
   bypassTextActive: { color: '#FCD34D' },
+  syncBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  syncBadgeSynced: { backgroundColor: '#064E3B', borderColor: '#10B981' },
+  syncBadgePending: { backgroundColor: '#78350F', borderColor: '#F59E0B' },
+  syncBadgeOffline: { backgroundColor: '#7F1D1D', borderColor: '#EF4444' },
+  syncBadgeText: { color: '#FFFFFF', fontSize: 10, fontWeight: 'bold' },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   headerActionBtn: {
     backgroundColor: '#0F172A',

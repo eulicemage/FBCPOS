@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
 import { SaleRecord } from '../services/checkoutService';
+import { useSyncQueueStore } from './syncQueueStore';
 
 export interface ShiftRecord {
   id: string;
@@ -231,6 +232,9 @@ export const useShiftStore = create<ShiftStoreState>((set, get) => ({
       currentShift: null, // Ready for incoming cashier to log in
       completedShifts: [closedShift, ...state.completedShifts],
     }));
+
+    // Enqueue SHIFT into Outbox Queue
+    useSyncQueueStore.getState().enqueue('SHIFT', closedShift.id, 'UPDATE', closedShift);
 
     return closedShift;
   },

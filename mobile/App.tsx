@@ -11,6 +11,8 @@ import { useCartStore } from './src/store/cartStore';
 import { useShiftStore } from './src/store/shiftStore';
 import { useReturnStore } from './src/services/returnService';
 import { useInventoryStore } from './src/store/inventoryStore';
+import { useSyncQueueStore } from './src/store/syncQueueStore';
+import { SyncService } from './src/services/syncService';
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<'POS' | 'INVENTORY' | 'LOGIN'>('POS');
@@ -22,6 +24,12 @@ export default function App() {
   const { recordSale, startShift, currentShift } = useShiftStore();
   const { currentUser, isBypassMode } = useAuthStore();
 
+  // Start background auto-sync loop
+  React.useEffect(() => {
+    SyncService.startAutoSync(15000);
+    return () => SyncService.stopAutoSync();
+  }, []);
+
   const handleNavigateToCheckout = () => {
     setTenderVisible(true);
   };
@@ -31,7 +39,10 @@ export default function App() {
     recordSale(sale);
     useReturnStore.getState().archiveSale(sale);
 
-    // Immutable inventory deduction
+    // 1. Enqueue Sale into Outbox Queue
+    useSyncQueueStore.getState().enqueue('SALE', sale.id, 'INSERT', sale);
+
+    // 2. Immutable inventory deduction & sync enqueue
     for (const item of sale.items) {
       useInventoryStore.getState().recordMovement({
         productId: item.productId,
@@ -41,6 +52,14 @@ export default function App() {
         referenceId: sale.invoiceNumber,
         reason: 'Point-of-Sale Counter Sale',
         performedBy: sale.cashierName,
+      });
+
+      useSyncQueueStore.getState().enqueue('STOCK_MOVEMENT', item.productId, 'INSERT', {
+        productId: item.productId,
+        productName: item.productName,
+        quantityChange: -item.quantity,
+        movementType: 'SALE',
+        referenceId: sale.invoiceNumber,
       });
     }
 

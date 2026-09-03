@@ -67,3 +67,4 @@ describe('InventoryStore', () => {
     expect(movements[0].reason).toBe('Bakery batch');
   });
 });
+

@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { SaleRecord } from './checkoutService';
 import { useInventoryStore } from '../store/inventoryStore';
 import { useMemberStore } from '../store/memberStore';
+import { useSyncQueueStore } from '../store/syncQueueStore';
 
 export type ReturnReason =
   | 'DEFECTIVE_EXPIRED'
@@ -195,6 +196,9 @@ export function processReturnTransaction(
   };
 
   useReturnStore.getState().recordReturn(returnRecord);
+
+  // Enqueue RETURN into Outbox Queue
+  useSyncQueueStore.getState().enqueue('RETURN', returnRecord.id, 'INSERT', returnRecord);
 
   return { success: true, returnRecord };
 }

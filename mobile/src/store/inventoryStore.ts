@@ -208,3 +208,4 @@ export const useInventoryStore = create<InventoryStoreState>((set, get) => ({
     });
   },
 }));
+
