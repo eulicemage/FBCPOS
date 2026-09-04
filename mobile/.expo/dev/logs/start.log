@@ -184,3 +184,9 @@
 {"_e":"metro:bundling:done","_t":1788405665045,"id":"1","total":771,"ms":34947.0207}
 {"_e":"metro:client_log","_t":1788405669176,"level":"warn","data":["SafeAreaView has been deprecated and will be removed in a future release. Please use 'react-native-safe-area-context' instead. See https://github.com/AppAndFlow/react-native-safe-area-context"]}
 {"_e":"metro:client_log","_t":1788405739305,"level":"error","data":["[Error: crypto.getRandomValues() not supported. See https://github.com/uuidjs/uuid#getrandomvalues-not-supported]"]}
+{"_e":"root:init","_t":1788487338871,"format":"v0-jsonl","version":"57.0.21"}
+{"_e":"env:mode","_t":1788487338895,"nodeEnv":"development","babelEnv":"development","mode":"development"}
+{"_e":"env:load","_t":1788487338918,"mode":"development","files":[],"env":{}}
+{"_e":"devserver:start","_t":1788487344530,"mode":"development","web":true,"baseUrl":"","asyncRoutes":false,"routerRoot":"../..\\..\\app","serverComponents":false,"serverActions":false,"serverRendering":false,"apiRoutes":false,"exporting":false}
+{"_e":"metro:config","_t":1788487354842,"serverRoot":"../..\\..","projectRoot":"../..\\..","exporting":false,"flags":{"autolinkingModuleResolution":false,"serverActions":false,"serverComponents":false,"reactCompiler":false,"optimizeGraph":false,"treeshaking":false,"logbox":false}}
+{"_e":"expo:dev-tools-plugin:load","_t":1788487360173,"plugins":[]}

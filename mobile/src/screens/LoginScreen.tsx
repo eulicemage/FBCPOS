@@ -1,372 +1,317 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from "react";
 import {
-  StyleSheet,
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  SafeAreaView,
-  Alert,
-} from 'react-native';
-import { useAuthStore } from '../store/authStore';
-import { UserRole } from '../../../shared/src';
+  StyleSheet, View, Text, TextInput, TouchableOpacity,
+  SafeAreaView, Alert, Modal, ScrollView, Switch,
+} from "react-native";
+import { useAuthStore } from "../store/authStore";
+import { useDrawerStore } from "../store/drawerStore";
+import { usePermissionStore } from "../store/permissionStore";
+import { UserRole } from "../../../shared/src";
+
+const C = {
+  navy:     "#1a2340",
+  navyDark: "#141a2e",
+  green:    "#2d7a2d",
+  orange:   "#e05020",
+  yellow:   "#f5c518",
+  white:    "#ffffff",
+  gray400:  "#9aa5b4",
+  gray600:  "#4a5568",
+  gray100:  "#f5f7fa",
+};
+
+const PROGRAMMER_PIN = "9999";
 
 interface LoginScreenProps {
   onLoginSuccess?: () => void;
+  onProgrammerBypass?: () => void;
 }
 
-export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
-  const { currentBranch, currentTerminal, isOnline, setAuth } = useAuthStore();
-  const [mode, setMode] = useState<'PIN' | 'CREDENTIALS'>('PIN');
-  const [pin, setPin] = useState('');
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [errorMsg, setErrorMsg] = useState('');
+export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onProgrammerBypass }) => {
+  const { currentBranch, currentTerminal, setAuth, isBypassMode, toggleBypassMode } = useAuthStore();
+  const { setOpeningFloat } = useDrawerStore();
+  const { findAccountByPin, getRoleById } = usePermissionStore();
 
-  const handlePinPress = (digit: string) => {
-    if (pin.length < 6) {
-      const nextPin = pin + digit;
-      setPin(nextPin);
-      setErrorMsg('');
-      if (nextPin.length === 4) {
-        verifyPin(nextPin);
-      }
-    }
+  const [pin, setPin] = useState("");
+  const [errorMsg, setErrorMsg] = useState("");
+  const [showProgrammer, setShowProgrammer] = useState(false);
+  const [programmerPin, setProgrammerPin] = useState("");
+  const [programmerError, setProgrammerError] = useState("");
+
+  // Cash declaration modal
+  const [showCashDecl, setShowCashDecl] = useState(false);
+  const [pendingUser, setPendingUser] = useState<any>(null);
+  const [cashInput, setCashInput] = useState("");
+
+  // Programmer settings state
+  const [serverMode, setServerMode] = useState<"standalone" | "lan" | "cloud">("standalone");
+  const [serverIp, setServerIp] = useState("192.168.1.1");
+  const [serverPort, setServerPort] = useState("3000");
+  const [featInventory, setFeatInventory] = useState(true);
+  const [featDrawer, setFeatDrawer] = useState(true);
+  const [featPrint, setFeatPrint] = useState(true);
+  const [featPricing, setFeatPricing] = useState(true);
+
+  const handlePinDigit = (d: string) => {
+    if (pin.length >= 6) return;
+    const next = pin + d;
+    setPin(next);
+    setErrorMsg("");
+    if (next.length >= 4) verifyPin(next);
   };
 
-  const handlePinBackspace = () => {
-    setPin(pin.slice(0, -1));
-    setErrorMsg('');
-  };
-
-  const handlePinClear = () => {
-    setPin('');
-    setErrorMsg('');
-  };
-
-  const verifyPin = (enteredPin: string) => {
-    // Demo verification (matches '1234' seeded PIN)
-    if (enteredPin === '1234') {
-      const cashierUser = {
-        id: 'USR-001',
-        username: 'cashier.001',
-        fullName: 'Maria Santos',
-        role: UserRole.CASHIER,
-        branchId: currentBranch?.id || 'BR-001',
-        isActive: true,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      setAuth(cashierUser, currentBranch!, currentTerminal!);
-      if (onLoginSuccess) onLoginSuccess();
-    } else {
-      setErrorMsg('Incorrect PIN. Please try again.');
-      setPin('');
-    }
-  };
-
-  const handleCredentialsSubmit = () => {
-    if (!username.trim() || !password.trim()) {
-      setErrorMsg('Please enter both username and password.');
+  const verifyPin = (p: string) => {
+    // Check programmer PIN first
+    if (p === PROGRAMMER_PIN) {
+      setPin("");
+      setShowProgrammer(true);
       return;
     }
 
-    if (username === 'admin' || username.startsWith('manager.')) {
-      const role = username === 'admin' ? UserRole.ADMIN : UserRole.MANAGER;
+    // Check staff accounts
+    const account = findAccountByPin(p);
+    if (account) {
+      const role = getRoleById(account.roleId);
       const user = {
-        id: 'USR-ADMIN-01',
-        username,
-        fullName: username === 'admin' ? 'System Administrator' : 'Branch Manager',
-        role,
-        branchId: currentBranch?.id || 'BR-001',
+        id: account.id,
+        username: account.username,
+        fullName: account.fullName,
+        role: role?.name === "Manager" ? UserRole.MANAGER : role?.name === "Programmer" ? UserRole.ADMIN : UserRole.CASHIER,
+        branchId: currentBranch?.id || "BR-001",
         isActive: true,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
-      setAuth(user, currentBranch!, currentTerminal!);
-      if (onLoginSuccess) onLoginSuccess();
-    } else {
-      setErrorMsg('Invalid username or password.');
+      setPendingUser(user);
+      setPin("");
+      setShowCashDecl(true);
+    } else if (p.length >= 4) {
+      setErrorMsg("Incorrect PIN. Try again.");
+      setPin("");
     }
   };
 
+  const handleCashDeclConfirm = () => {
+    const amount = parseFloat(cashInput.replace(/,/g, "")) || 0;
+    setOpeningFloat(amount);
+    setAuth(pendingUser, currentBranch!, currentTerminal!);
+    setShowCashDecl(false);
+    setCashInput("");
+    setPendingUser(null);
+    if (onLoginSuccess) onLoginSuccess();
+  };
+
+  const handleProgrammerBypass = () => {
+    if (programmerPin !== PROGRAMMER_PIN) {
+      setProgrammerError("Incorrect programmer PIN.");
+      return;
+    }
+    setProgrammerError("");
+    setShowProgrammer(false);
+    setProgrammerPin("");
+    if (onProgrammerBypass) {
+      onProgrammerBypass();
+    } else {
+      // Enter POS directly as programmer
+      const progUser = {
+        id: "USR-PROG-001",
+        username: "programmer",
+        fullName: "Programmer",
+        role: UserRole.ADMIN,
+        branchId: currentBranch?.id || "BR-001",
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      setAuth(progUser, currentBranch!, currentTerminal!);
+      toggleBypassMode(true);
+      if (onLoginSuccess) onLoginSuccess();
+    }
+  };
+
+  const renderPinDots = () =>
+    [0,1,2,3,4,5].map((i) => (
+      <View key={i} style={[styles.pinDot, i < pin.length && styles.pinDotFilled]} />
+    ));
+
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.card}>
-        {/* Branch & Terminal Info Header */}
-        <View style={styles.header}>
-          <Text style={styles.brandTitle}>FoodBaskets Corp POS</Text>
-          <Text style={styles.branchSub}>
-            {currentBranch?.name} — {currentTerminal?.name}
-          </Text>
-          <View style={[styles.badge, isOnline ? styles.badgeOnline : styles.badgeOffline]}>
-            <Text style={styles.badgeText}>{isOnline ? '● ONLINE' : '○ OFFLINE OPERATIONAL'}</Text>
-          </View>
-        </View>
+    <SafeAreaView style={styles.root}>
+      {/* FBC Logo */}
+      <View style={styles.logoWrap}>
+        <Text style={styles.logoF}>f</Text>
+        <Text style={styles.logoB}>b</Text>
+        <Text style={styles.logoC}>c</Text>
+      </View>
+      <Text style={styles.logoSubText}>FOOD BASKETS CORPORATION</Text>
+      <Text style={styles.posLabel}>Point of Sale System</Text>
 
-        {/* Tab Selector */}
-        <View style={styles.tabContainer}>
+      {/* Branch / Terminal */}
+      <Text style={styles.branchText}>{currentBranch?.name} — {currentTerminal?.name}</Text>
+
+      {/* PIN dots */}
+      <View style={styles.pinDotsRow}>{renderPinDots()}</View>
+      {errorMsg ? <Text style={styles.errorText}>{errorMsg}</Text> : null}
+
+      {/* PIN pad */}
+      <View style={styles.pinPad}>
+        {["1","2","3","4","5","6","7","8","9","CLR","0","⌫"].map((k) => (
           <TouchableOpacity
-            style={[styles.tab, mode === 'PIN' && styles.tabActive]}
+            key={k}
+            style={[styles.pinKey, (k === "CLR" || k === "⌫") && styles.pinKeyAlt]}
             onPress={() => {
-              setMode('PIN');
-              setErrorMsg('');
+              if (k === "⌫") setPin((p) => p.slice(0,-1));
+              else if (k === "CLR") { setPin(""); setErrorMsg(""); }
+              else handlePinDigit(k);
             }}
           >
-            <Text style={[styles.tabText, mode === 'PIN' && styles.tabTextActive]}>
-              Cashier PIN Login
-            </Text>
+            <Text style={styles.pinKeyText}>{k}</Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tab, mode === 'CREDENTIALS' && styles.tabActive]}
-            onPress={() => {
-              setMode('CREDENTIALS');
-              setErrorMsg('');
-            }}
-          >
-            <Text style={[styles.tabText, mode === 'CREDENTIALS' && styles.tabTextActive]}>
-              Manager / Admin
-            </Text>
-          </TouchableOpacity>
-        </View>
+        ))}
+      </View>
 
-        {errorMsg ? <Text style={styles.errorText}>{errorMsg}</Text> : null}
+      {/* Programmer bypass button */}
+      <TouchableOpacity style={styles.progBtn} onPress={() => setShowProgrammer(true)}>
+        <Text style={styles.progBtnText}>🛠 Programmer</Text>
+      </TouchableOpacity>
 
-        {mode === 'PIN' ? (
-          /* Numpad PIN View */
-          <View style={styles.pinSection}>
-            <Text style={styles.instruction}>Enter 4-Digit Cashier PIN</Text>
-            <View style={styles.pinDotsContainer}>
-              {[0, 1, 2, 3].map((i) => (
-                <View
-                  key={i}
-                  style={[styles.pinDot, pin.length > i && styles.pinDotFilled]}
-                />
-              ))}
-            </View>
-
-            <View style={styles.numpad}>
-              {[
-                ['1', '2', '3'],
-                ['4', '5', '6'],
-                ['7', '8', '9'],
-                ['CLEAR', '0', '⌫'],
-              ].map((row, rIdx) => (
-                <View key={rIdx} style={styles.numpadRow}>
-                  {row.map((btn) => (
-                    <TouchableOpacity
-                      key={btn}
-                      style={[
-                        styles.numBtn,
-                        btn === 'CLEAR' && styles.actionBtn,
-                        btn === '⌫' && styles.actionBtn,
-                      ]}
-                      onPress={() => {
-                        if (btn === 'CLEAR') handlePinClear();
-                        else if (btn === '⌫') handlePinBackspace();
-                        else handlePinPress(btn);
-                      }}
-                    >
-                      <Text style={styles.numBtnText}>{btn}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              ))}
-            </View>
-          </View>
-        ) : (
-          /* Manager / Admin Credentials View */
-          <View style={styles.credentialsSection}>
-            <Text style={styles.inputLabel}>Username</Text>
+      {/* ─── CASH DECLARATION MODAL ─────────────────────────── */}
+      <Modal visible={showCashDecl} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.cashModal}>
+            <Text style={styles.cashModalTitle}>💰 Opening Cash Declaration</Text>
+            <Text style={styles.cashModalSub}>Welcome, {pendingUser?.fullName}. Enter the cash float in the drawer before starting your shift.</Text>
             <TextInput
-              style={styles.input}
-              placeholder="e.g. admin or manager.001"
-              placeholderTextColor="#64748B"
-              value={username}
-              onChangeText={setUsername}
-              autoCapitalize="none"
+              style={styles.cashInput}
+              value={cashInput}
+              onChangeText={setCashInput}
+              keyboardType="decimal-pad"
+              placeholder="0.00"
+              placeholderTextColor={C.gray400}
+              autoFocus
             />
-            <Text style={styles.inputLabel}>Password</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Enter password"
-              placeholderTextColor="#64748B"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-            />
-            <TouchableOpacity style={styles.loginBtn} onPress={handleCredentialsSubmit}>
-              <Text style={styles.loginBtnText}>Sign In as Supervisor</Text>
+            <Text style={styles.cashHint}>₱ Amount in Drawer</Text>
+            <TouchableOpacity style={styles.cashConfirmBtn} onPress={handleCashDeclConfirm}>
+              <Text style={styles.cashConfirmText}>CONFIRM & OPEN REGISTER</Text>
             </TouchableOpacity>
           </View>
-        )}
-      </View>
+        </View>
+      </Modal>
+
+      {/* ─── PROGRAMMER SETTINGS MODAL ──────────────────────── */}
+      <Modal visible={showProgrammer} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.progModal}>
+            <View style={styles.progModalHeader}>
+              <Text style={styles.progModalTitle}>🛠 Programmer Settings</Text>
+              <TouchableOpacity onPress={() => { setShowProgrammer(false); setProgrammerPin(""); setProgrammerError(""); }}>
+                <Text style={styles.closeBtn}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView>
+              {/* PIN entry */}
+              <Text style={styles.progSection}>Programmer PIN</Text>
+              <TextInput
+                style={styles.progInput}
+                value={programmerPin}
+                onChangeText={setProgrammerPin}
+                secureTextEntry
+                keyboardType="number-pad"
+                maxLength={6}
+                placeholder="Enter programmer PIN"
+                placeholderTextColor={C.gray400}
+              />
+              {programmerError ? <Text style={styles.errorText}>{programmerError}</Text> : null}
+
+              {/* Server mode */}
+              <Text style={styles.progSection}>Server Connection</Text>
+              <View style={styles.segRow}>
+                {(["standalone","lan","cloud"] as const).map((m) => (
+                  <TouchableOpacity key={m} style={[styles.segBtn, serverMode===m && styles.segBtnActive]} onPress={() => setServerMode(m)}>
+                    <Text style={[styles.segBtnText, serverMode===m && styles.segBtnTextActive]}>{m.toUpperCase()}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              {serverMode !== "standalone" && (
+                <View style={styles.inputRow}>
+                  <TextInput style={[styles.progInput, { flex: 2 }]} value={serverIp} onChangeText={setServerIp} placeholder="Server IP" placeholderTextColor={C.gray400} />
+                  <TextInput style={[styles.progInput, { flex: 1, marginLeft: 6 }]} value={serverPort} onChangeText={setServerPort} placeholder="Port" placeholderTextColor={C.gray400} keyboardType="number-pad" />
+                </View>
+              )}
+
+              {/* Feature toggles */}
+              <Text style={styles.progSection}>POS Feature Toggles</Text>
+              {[
+                ["Inventory Tracking", featInventory, setFeatInventory],
+                ["Cash Drawer Kick on Sale", featDrawer, setFeatDrawer],
+                ["Receipt Printing", featPrint, setFeatPrint],
+                ["Pricing Editor (Add/Edit Products)", featPricing, setFeatPricing],
+              ].map(([label, val, setter]: any) => (
+                <View key={label as string} style={styles.toggleRow}>
+                  <Text style={styles.toggleLabel}>{label as string}</Text>
+                  <Switch value={val as boolean} onValueChange={setter} trackColor={{ true: C.green }} />
+                </View>
+              ))}
+
+              {/* Show main form */}
+              <TouchableOpacity style={[styles.progActionBtn, { backgroundColor: C.green }]} onPress={handleProgrammerBypass}>
+                <Text style={styles.progActionBtnText}>✔ AUTHENTICATE & ENTER POS</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={[styles.progActionBtn, { backgroundColor: C.navy, marginTop: 6 }]} onPress={() => Alert.alert("SQL Console", "SQL scripting console would open here.")}>
+                <Text style={styles.progActionBtnText}>⚙ SQL Scripting Console</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0F172A',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  card: {
-    width: 480,
-    backgroundColor: '#1E293B',
-    borderRadius: 16,
-    padding: 24,
-    borderWidth: 1,
-    borderColor: '#334155',
-  },
-  header: {
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  brandTitle: {
-    color: '#38BDF8',
-    fontSize: 22,
-    fontWeight: 'bold',
-  },
-  branchSub: {
-    color: '#94A3B8',
-    fontSize: 13,
-    marginTop: 4,
-  },
-  badge: {
-    marginTop: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    borderRadius: 12,
-  },
-  badgeOnline: {
-    backgroundColor: '#065F46',
-  },
-  badgeOffline: {
-    backgroundColor: '#991B1B',
-  },
-  badgeText: {
-    color: '#FFFFFF',
-    fontSize: 10,
-    fontWeight: 'bold',
-  },
-  tabContainer: {
-    flexDirection: 'row',
-    backgroundColor: '#0F172A',
-    borderRadius: 8,
-    padding: 4,
-    marginBottom: 16,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: 'center',
-    borderRadius: 6,
-  },
-  tabActive: {
-    backgroundColor: '#0284C7',
-  },
-  tabText: {
-    color: '#94A3B8',
-    fontWeight: '600',
-    fontSize: 13,
-  },
-  tabTextActive: {
-    color: '#FFFFFF',
-  },
-  errorText: {
-    color: '#EF4444',
-    textAlign: 'center',
-    fontSize: 13,
-    marginBottom: 10,
-    fontWeight: '500',
-  },
-  pinSection: {
-    alignItems: 'center',
-  },
-  instruction: {
-    color: '#CBD5E1',
-    fontSize: 14,
-    marginBottom: 12,
-  },
-  pinDotsContainer: {
-    flexDirection: 'row',
-    gap: 14,
-    marginBottom: 20,
-  },
-  pinDot: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    borderWidth: 2,
-    borderColor: '#64748B',
-    backgroundColor: 'transparent',
-  },
-  pinDotFilled: {
-    backgroundColor: '#38BDF8',
-    borderColor: '#38BDF8',
-  },
-  numpad: {
-    width: '100%',
-    gap: 10,
-  },
-  numpadRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 10,
-  },
-  numBtn: {
-    flex: 1,
-    height: 60,
-    backgroundColor: '#0F172A',
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#334155',
-  },
-  actionBtn: {
-    backgroundColor: '#1E293B',
-  },
-  numBtnText: {
-    color: '#FFFFFF',
-    fontSize: 22,
-    fontWeight: 'bold',
-  },
-  credentialsSection: {
-    paddingVertical: 10,
-  },
-  inputLabel: {
-    color: '#94A3B8',
-    fontSize: 13,
-    marginBottom: 6,
-    marginTop: 8,
-  },
-  input: {
-    height: 48,
-    backgroundColor: '#0F172A',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    color: '#FFFFFF',
-    fontSize: 15,
-    borderWidth: 1,
-    borderColor: '#334155',
-    marginBottom: 8,
-  },
-  loginBtn: {
-    marginTop: 16,
-    height: 50,
-    backgroundColor: '#0284C7',
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  loginBtnText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
+  root: { flex: 1, backgroundColor: C.navyDark, alignItems: "center", justifyContent: "center" },
+  logoWrap: { flexDirection: "row", marginBottom: 4 },
+  logoF: { fontSize: 64, fontWeight: "900", color: "#2d7a2d" },
+  logoB: { fontSize: 64, fontWeight: "900", color: "#e05020" },
+  logoC: { fontSize: 64, fontWeight: "900", color: "#f5c518" },
+  logoSubText: { fontSize: 12, color: C.gray400, letterSpacing: 2, marginBottom: 4 },
+  posLabel: { fontSize: 16, color: C.white, marginBottom: 6 },
+  branchText: { fontSize: 12, color: C.gray400, marginBottom: 24 },
+  pinDotsRow: { flexDirection: "row", gap: 12, marginBottom: 8 },
+  pinDot: { width: 14, height: 14, borderRadius: 7, borderWidth: 2, borderColor: C.gray400 },
+  pinDotFilled: { backgroundColor: C.green, borderColor: C.green },
+  errorText: { color: "#ef5350", fontSize: 12, marginBottom: 8 },
+  pinPad: { flexDirection: "row", flexWrap: "wrap", width: 216, gap: 8, justifyContent: "center", marginTop: 12 },
+  pinKey: { width: 64, height: 56, borderRadius: 10, backgroundColor: "#243050", alignItems: "center", justifyContent: "center" },
+  pinKeyAlt: { backgroundColor: "#1e2d50" },
+  pinKeyText: { fontSize: 20, fontWeight: "700", color: C.white },
+  progBtn: { marginTop: 20, paddingVertical: 8, paddingHorizontal: 20 },
+  progBtnText: { fontSize: 12, color: C.gray400, textDecorationLine: "underline" },
+  // Cash modal
+  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.7)", alignItems: "center", justifyContent: "center" },
+  cashModal: { backgroundColor: C.white, borderRadius: 16, padding: 28, width: 340, alignItems: "center" },
+  cashModalTitle: { fontSize: 18, fontWeight: "900", color: C.navyDark, marginBottom: 8 },
+  cashModalSub: { fontSize: 13, color: C.gray600, textAlign: "center", marginBottom: 20 },
+  cashInput: { fontSize: 36, fontWeight: "900", color: C.navyDark, textAlign: "center", borderBottomWidth: 2, borderBottomColor: C.green, width: "100%", paddingBottom: 4, marginBottom: 4 },
+  cashHint: { fontSize: 12, color: C.gray400, marginBottom: 20 },
+  cashConfirmBtn: { backgroundColor: C.green, borderRadius: 10, paddingVertical: 14, paddingHorizontal: 24, width: "100%", alignItems: "center" },
+  cashConfirmText: { color: C.white, fontWeight: "900", fontSize: 14 },
+  // Programmer modal
+  progModal: { backgroundColor: C.navyDark, borderRadius: 16, padding: 20, width: 440, maxHeight: "85%", borderWidth: 1, borderColor: "#2d3f6a" },
+  progModalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 },
+  progModalTitle: { fontSize: 16, fontWeight: "900", color: C.white },
+  closeBtn: { fontSize: 18, color: C.gray400 },
+  progSection: { fontSize: 11, color: C.gray400, letterSpacing: 1, marginTop: 16, marginBottom: 8 },
+  progInput: { backgroundColor: "#243050", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, color: C.white, fontSize: 14, marginBottom: 4 },
+  segRow: { flexDirection: "row", gap: 6, marginBottom: 8 },
+  segBtn: { flex: 1, borderRadius: 8, borderWidth: 1.5, borderColor: "#2d3f6a", paddingVertical: 8, alignItems: "center" },
+  segBtnActive: { backgroundColor: C.green, borderColor: C.green },
+  segBtnText: { fontSize: 11, fontWeight: "700", color: C.gray400 },
+  segBtnTextActive: { color: C.white },
+  inputRow: { flexDirection: "row" },
+  toggleRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: "#1e2d50" },
+  toggleLabel: { fontSize: 13, color: C.white },
+  progActionBtn: { borderRadius: 10, paddingVertical: 14, alignItems: "center", marginTop: 16 },
+  progActionBtnText: { color: C.white, fontWeight: "900", fontSize: 14 },
 });
-

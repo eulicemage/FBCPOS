@@ -4,7 +4,9 @@
     "module": "preserve",
     "moduleDetection": "force",
     "moduleResolution": "bundler",
-    "customConditions": ["react-native"],
+    "customConditions": [
+      "react-native"
+    ],
     "jsx": "react-jsx",
     "strict": true,
     "allowJs": true,
@@ -22,5 +24,6 @@
     "babel.config.js",
     "metro.config.js",
     "dist"
-  ]
+  ],
+  "extends": "expo/tsconfig.base"
 }
