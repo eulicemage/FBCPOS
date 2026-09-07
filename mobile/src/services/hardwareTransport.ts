@@ -86,6 +86,21 @@ export class HardwareManager {
   }
 
   static async printBuffer(data: Uint8Array): Promise<PrintResult> {
+    if (typeof window !== 'undefined' && (window as any).electronPOS) {
+      const printerIp = (HardwareManager.transport as any).ip || '192.168.1.100';
+      const printerPort = (HardwareManager.transport as any).port || 9100;
+      const res = await (window as any).electronPOS.printThermalReceipt({
+        host: printerIp,
+        port: printerPort,
+        bytes: Array.from(data),
+      });
+      return {
+        success: res.success,
+        bytesSent: res.success ? data.length : 0,
+        transportType: `ELECTRON TCP (${printerIp}:${printerPort})`,
+        error: res.success ? undefined : res.message,
+      };
+    }
     return HardwareManager.transport.send(data);
   }
 }

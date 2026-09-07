@@ -94,6 +94,21 @@ export const useHardwareStore = create<HardwareState>((set, get) => ({
   },
 
   kickCashDrawer: async () => {
+    if (typeof window !== 'undefined' && (window as any).electronPOS) {
+      const res = await (window as any).electronPOS.kickCashDrawer({
+        host: get().printerIp,
+        port: get().printerPort,
+        pin: get().drawerPin,
+      });
+      const result: PrintResult = {
+        success: res.success,
+        bytesSent: res.success ? 5 : 0,
+        transportType: 'ELECTRON RJ11 DRAWER',
+        error: res.success ? undefined : res.message,
+      };
+      set({ lastPrintResult: result });
+      return result;
+    }
     const bytes = PrinterService.formatDrawerKick(get().drawerPin);
     const result = await HardwareManager.printBuffer(bytes);
     set({ lastPrintResult: result });
