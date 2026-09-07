@@ -197,3 +197,32 @@
 {"_e":"devserver:start","_t":1788492462426,"mode":"development","web":true,"baseUrl":"","asyncRoutes":false,"routerRoot":"../..\\..\\app","serverComponents":false,"serverActions":false,"serverRendering":false,"apiRoutes":false,"exporting":false}
 {"_e":"metro:config","_t":1788492463012,"serverRoot":"../..\\..","projectRoot":"../..\\..","exporting":false,"flags":{"autolinkingModuleResolution":false,"serverActions":false,"serverComponents":false,"reactCompiler":false,"optimizeGraph":false,"treeshaking":false,"logbox":false}}
 {"_e":"expo:dev-tools-plugin:load","_t":1788492465526,"plugins":[]}
+{"_e":"metro:instantiate","_t":1788492473322,"atlas":false,"workers":1,"host":"::","port":8081}
+{"_e":"metro:bundling:started","_t":1788492647793,"id":"1","platform":"android","environment":null,"entry":"index.js"}
+{"_e":"metro:bundling:progress","_t":1788492647794,"id":"1","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1788492647838,"id":"1","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1788492648517,"id":"1","progress":0.04000000000000001,"total":3,"current":2}
+{"_e":"metro:bundling:progress","_t":1788492648655,"id":"1","progress":0.04000000000000001,"total":27,"current":4}
+{"_e":"metro:bundling:progress","_t":1788492648980,"id":"1","progress":0.04000000000000001,"total":127,"current":6}
+{"_e":"metro:bundling:progress","_t":1788492649103,"id":"1","progress":0.04000000000000001,"total":147,"current":7}
+{"_e":"metro:bundling:progress","_t":1788492649298,"id":"1","progress":0.04000000000000001,"total":150,"current":9}
+{"_e":"metro:bundling:progress","_t":1788492649399,"id":"1","progress":0.04348509692055434,"total":211,"current":44}
+{"_e":"metro:bundling:progress","_t":1788492649501,"id":"1","progress":0.11933884297520661,"total":275,"current":95}
+{"_e":"metro:bundling:progress","_t":1788492649602,"id":"1","progress":0.18408738130021915,"total":296,"current":127}
+{"_e":"metro:bundling:progress","_t":1788492649702,"id":"1","progress":0.2640378698224852,"total":325,"current":167}
+{"_e":"metro:bundling:progress","_t":1788492649804,"id":"1","progress":0.30649063127716875,"total":401,"current":222}
+{"_e":"metro:bundling:progress","_t":1788492649904,"id":"1","progress":0.4071915594092321,"total":467,"current":298}
+{"_e":"metro:bundling:progress","_t":1788492650004,"id":"1","progress":0.513701947404184,"total":526,"current":377}
+{"_e":"metro:bundling:progress","_t":1788492650104,"id":"1","progress":0.789073110004527,"total":564,"current":501}
+{"_e":"metro:bundling:progress","_t":1788492650204,"id":"1","progress":0.843585704358515,"total":601,"current":552}
+{"_e":"metro:bundling:progress","_t":1788492650304,"id":"1","progress":0.843585704358515,"total":682,"current":616}
+{"_e":"metro:bundling:progress","_t":1788492650404,"id":"1","progress":0.9023714524803111,"total":739,"current":702}
+{"_e":"metro:bundling:progress","_t":1788492650510,"id":"1","progress":0.999,"total":773,"current":773}
+{"_e":"metro:bundling:done","_t":1788492650586,"id":"1","total":773,"ms":2792.3756}
+{"_e":"metro:client_log","_t":1788492657773,"level":"warn","data":["SafeAreaView has been deprecated and will be removed in a future release. Please use 'react-native-safe-area-context' instead. See https://github.com/AppAndFlow/react-native-safe-area-context"]}
+{"_e":"metro:bundling:started","_t":1788492764900,"id":"3","platform":"android","environment":null,"entry":"index.js"}
+{"_e":"metro:bundling:progress","_t":1788492764901,"id":"3","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1788492764971,"id":"3","total":1,"ms":70.6229}
+{"_e":"metro:client_log","_t":1788492772339,"level":"warn","data":["SafeAreaView has been deprecated and will be removed in a future release. Please use 'react-native-safe-area-context' instead. See https://github.com/AppAndFlow/react-native-safe-area-context"]}
+{"_e":"metro:client_log","_t":1788492929354,"level":"error","data":["[Error: crypto.getRandomValues() not supported. See https://github.com/uuidjs/uuid#getrandomvalues-not-supported]"]}
+{"_e":"metro:client_log","_t":1788492936776,"level":"error","data":["[Error: crypto.getRandomValues() not supported. See https://github.com/uuidjs/uuid#getrandomvalues-not-supported]"]}
