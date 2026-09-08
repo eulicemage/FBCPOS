@@ -15,6 +15,7 @@ import { useMemberGroupStore } from "../store/memberGroupStore";
 import { usePaymentMethodStore } from "../store/paymentMethodStore";
 import { useHardwareStore } from "../store/hardwareStore";
 import { ShiftReadingModal } from "../components/ShiftReadingModal";
+import { CalculatorModal } from "../components/CalculatorModal";
 import { StoreSettingsScreen } from "./StoreSettingsScreen";
 import { StaffSettingsScreen } from "./StaffSettingsScreen";
 import { DatabaseBackupScreen } from "./DatabaseBackupScreen";
@@ -73,6 +74,7 @@ export const MoreMenuScreen: React.FC<MoreMenuScreenProps> = ({ onClose, onSwitc
   const [selectedSale, setSelectedSale] = useState<SaleRecord | null>(null);
   const [zReadModalVisible, setZReadModalVisible] = useState(false);
   const [xReadModalVisible, setXReadModalVisible] = useState(false);
+  const [calculatorVisible, setCalculatorVisible] = useState(false);
 
   // Delivery records
   const [deliveryRecords, setDeliveryRecords] = useState<Array<{ id: string; drNumber: string; date: string; supplier: string; itemsCount: number; amount: number }>>([
@@ -139,7 +141,7 @@ export const MoreMenuScreen: React.FC<MoreMenuScreenProps> = ({ onClose, onSwitc
           } else if (view === "CLOSE_STORE") {
             setZReadModalVisible(true);
           } else if (view === "CALCULATOR") {
-            Alert.alert("Calculator", "Quick Calculator is ready.");
+            setCalculatorVisible(true);
           } else {
             setActiveView(view);
           }
@@ -1027,6 +1029,10 @@ export const MoreMenuScreen: React.FC<MoreMenuScreenProps> = ({ onClose, onSwitc
           setXReadModalVisible(false);
           if (onSwitchCashier) onSwitchCashier();
         }}
+      />
+      <CalculatorModal
+        visible={calculatorVisible}
+        onClose={() => setCalculatorVisible(false)}
       />
     </View>
   );

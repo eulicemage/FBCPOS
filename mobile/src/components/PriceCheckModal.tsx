@@ -12,6 +12,7 @@ import { Product } from '../../../shared/src';
 interface PriceCheckModalProps {
   visible: boolean;
   products: Product[];
+  initialQuery?: string;
   onClose: () => void;
   onAddToCart: (product: Product) => void;
 }
@@ -19,11 +20,31 @@ interface PriceCheckModalProps {
 export const PriceCheckModal: React.FC<PriceCheckModalProps> = ({
   visible,
   products,
+  initialQuery = '',
   onClose,
   onAddToCart,
 }) => {
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(initialQuery);
   const [result, setResult] = useState<Product | null>(null);
+
+  React.useEffect(() => {
+    if (visible) {
+      const q = initialQuery || '';
+      setQuery(q);
+      if (q.trim()) {
+        const clean = q.trim().toLowerCase();
+        const match = products.find(
+          (p) =>
+            p.barcode === q.trim() ||
+            p.sku.toLowerCase() === clean ||
+            p.name.toLowerCase().includes(clean)
+        );
+        setResult(match || null);
+      } else {
+        setResult(null);
+      }
+    }
+  }, [visible, initialQuery, products]);
 
   const handleLookup = () => {
     if (!query.trim()) return;

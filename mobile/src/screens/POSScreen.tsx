@@ -19,6 +19,8 @@ import { Product, DiscountType } from "../../../shared/src";
 import { DiscountModal } from "../components/DiscountModal";
 import { HeldCartsModal } from "../components/HeldCartsModal";
 import { PriceCheckModal } from "../components/PriceCheckModal";
+import { QuantityModal } from "../components/QuantityModal";
+import { CalculatorModal } from "../components/CalculatorModal";
 import { SupervisorPinModal } from "../components/SupervisorPinModal";
 import { QuickAddProductModal } from "../components/QuickAddProductModal";
 import { MemberManagementModal } from "../components/MemberManagementModal";
@@ -92,6 +94,9 @@ export const POSScreen: React.FC<POSScreenProps> = ({
   const [discountItemMode, setDiscountItemMode] = useState(false);
   const [heldCartsModalVisible, setHeldCartsModalVisible] = useState(false);
   const [priceCheckModalVisible, setPriceCheckModalVisible] = useState(false);
+  const [priceCheckQuery, setPriceCheckQuery] = useState("");
+  const [quantityModalVisible, setQuantityModalVisible] = useState(false);
+  const [calculatorModalVisible, setCalculatorModalVisible] = useState(false);
   const [supervisorModalVisible, setSupervisorModalVisible] = useState(false);
   const [quickAddModalVisible, setQuickAddModalVisible] = useState(false);
   const [pendingAddBarcode, setPendingAddBarcode] = useState("");
@@ -127,12 +132,17 @@ export const POSScreen: React.FC<POSScreenProps> = ({
     onScan: handleBarcodeScan,
     enabled:
       !discountModalVisible && !heldCartsModalVisible && !priceCheckModalVisible &&
-      !quickAddModalVisible && !memberModalVisible && !readingModalVisible && !hardwareModalVisible,
+      !quickAddModalVisible && !memberModalVisible && !readingModalVisible && !hardwareModalVisible &&
+      !quantityModalVisible && !calculatorModalVisible,
   });
 
   function handleBarcodeScan(code: string) {
     const cleaned = code.trim();
-    if (!cleaned) return;
+    if (!cleaned) {
+      setPriceCheckQuery("");
+      setPriceCheckModalVisible(true);
+      return;
+    }
     const member = findMemberByBarcode(cleaned);
     if (member) {
       setCustomerInfo(member.fullName);
@@ -144,16 +154,21 @@ export const POSScreen: React.FC<POSScreenProps> = ({
     if (product) {
       addItem(product);
       setBarcodeInput("");
-    } else {
-      Alert.alert(
-        "Barcode Not Found",
-        `No product for barcode "${cleaned}". Add it now?`,
-        [
-          { text: "Cancel", style: "cancel" },
-          { text: "Add Product", onPress: () => { setPendingAddBarcode(cleaned); setQuickAddModalVisible(true); } },
-        ]
-      );
+      return;
     }
+    const nameMatch = products.find(
+      (p) =>
+        p.sku.toLowerCase() === cleaned.toLowerCase() ||
+        p.name.toLowerCase() === cleaned.toLowerCase()
+    );
+    if (nameMatch) {
+      addItem(nameMatch);
+      setBarcodeInput("");
+      return;
+    }
+    setPriceCheckQuery(cleaned);
+    setPriceCheckModalVisible(true);
+    setBarcodeInput("");
   }
 
   function handleBarcodeSubmit() {
@@ -299,7 +314,7 @@ export const POSScreen: React.FC<POSScreenProps> = ({
         <View style={styles.sidebar}>
           <NavButton label="Register" active onPress={() => {}} />
           <NavButton label="Shift Handover" onPress={handleSwitchCashier} />
-          <NavButton label="Calculator" onPress={() => Alert.alert("Calculator", "Quick Calculator ready.")} />
+          <NavButton label="Calculator" onPress={() => setCalculatorModalVisible(true)} />
           <NavButton label="More Hub" onPress={onOpenMore} />
 
           <View style={styles.divider} />
@@ -396,10 +411,7 @@ export const POSScreen: React.FC<POSScreenProps> = ({
               <ActionBtn label="Quantity" sublabel="Ctrl+Q" color={C.blue} disabled={!can("QUANTITY_CHANGE")}
                 onPress={() => {
                   if (!selectedItemId) { Alert.alert("Select Item", "Select an item from the cart first."); return; }
-                  Alert.prompt?.("Quantity", "Enter quantity:", (v) => {
-                    const q = parseInt(v ?? "");
-                    if (!isNaN(q) && q > 0) updateQuantity(selectedItemId, q);
-                  });
+                  setQuantityModalVisible(true);
                 }} />
             </View>
 
@@ -473,7 +485,9 @@ export const POSScreen: React.FC<POSScreenProps> = ({
       {/* ─── MODALS ───────────────────────────────────────────── */}
       <DiscountModal visible={discountModalVisible} onClose={() => setDiscountModalVisible(false)} onApplyDiscount={(type: DiscountType, value: number) => { applyDiscount(type, value); setDiscountModalVisible(false); }} />
       <HeldCartsModal visible={heldCartsModalVisible} onClose={() => setHeldCartsModalVisible(false)} onRecallCart={(cart: HeldCart) => { loadCart(cart.items, cart.discountType, cart.discountValue, cart.customerName, cart.customerTinId); setHeldCartsModalVisible(false); }} />
-      <PriceCheckModal visible={priceCheckModalVisible} onClose={() => setPriceCheckModalVisible(false)} products={products} onAddToCart={(p: Product) => { addItem(p); setPriceCheckModalVisible(false); }} />
+      <PriceCheckModal visible={priceCheckModalVisible} initialQuery={priceCheckQuery} onClose={() => setPriceCheckModalVisible(false)} products={products} onAddToCart={(p: Product) => { addItem(p); setPriceCheckModalVisible(false); }} />
+      <QuantityModal visible={quantityModalVisible} initialQuantity={items.find((i) => i.productId === selectedItemId)?.quantity || 1} itemName={items.find((i) => i.productId === selectedItemId)?.name} onClose={() => setQuantityModalVisible(false)} onConfirm={(qty) => { if (selectedItemId) updateQuantity(selectedItemId, qty); }} />
+      <CalculatorModal visible={calculatorModalVisible} onClose={() => setCalculatorModalVisible(false)} />
       <SupervisorPinModal visible={supervisorModalVisible} actionTitle="Authorize Action" onAuthorize={() => handleSupervisorAuthorized()} onCancel={() => setSupervisorModalVisible(false)} />
       <QuickAddProductModal visible={quickAddModalVisible} initialBarcode={pendingAddBarcode} onClose={() => setQuickAddModalVisible(false)} onProductAdded={(p: Product) => { addItem(p); setQuickAddModalVisible(false); }} />
       <MemberManagementModal visible={memberModalVisible} onClose={() => setMemberModalVisible(false)} />
