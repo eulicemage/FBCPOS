@@ -154,7 +154,7 @@ export const ShiftReadingModal: React.FC<ShiftReadingModalProps> = ({
           <View style={[styles.header, !isXRead && styles.headerZ]}>
             <View>
               <Text style={styles.title}>
-                {isXRead ? '⇄ X-READING (SWITCH CASHIER)' : '🛑 Z-READING (CLOSE STORE)'}
+                {isXRead ? 'X-Reading (Shift Handover)' : 'Z-Reading (Store Closing)'}
               </Text>
               <Text style={styles.subtitle}>
                 {isXRead
@@ -199,25 +199,25 @@ export const ShiftReadingModal: React.FC<ShiftReadingModalProps> = ({
                 <Text style={[styles.sectionTitle, { marginTop: 14 }]}>Collections by Tender</Text>
                 <View style={styles.tenderList}>
                   <View style={styles.tenderRow}>
-                    <Text style={styles.tenderLabel}>💵 Cash Collected</Text>
+                    <Text style={styles.tenderLabel}>Cash Collected</Text>
                     <Text style={styles.tenderVal}>P{shift.cashCollected.toFixed(2)}</Text>
                   </View>
                   <View style={styles.tenderRow}>
-                    <Text style={styles.tenderLabel}>💳 Card Payments</Text>
+                    <Text style={styles.tenderLabel}>Card Payments</Text>
                     <Text style={styles.tenderVal}>P{shift.cardTotal.toFixed(2)}</Text>
                   </View>
                   <View style={styles.tenderRow}>
-                    <Text style={styles.tenderLabel}>📱 GCash / Maya</Text>
+                    <Text style={styles.tenderLabel}>GCash / Maya</Text>
                     <Text style={styles.tenderVal}>
                       P{(shift.gcashTotal + shift.mayaTotal).toFixed(2)}
                     </Text>
                   </View>
                   <View style={styles.tenderRow}>
-                    <Text style={styles.tenderLabel}>🏷 Member Points Redeemed</Text>
+                    <Text style={styles.tenderLabel}>Member Points Redeemed</Text>
                     <Text style={styles.tenderVal}>P{shift.pointsTotal.toFixed(2)}</Text>
                   </View>
                   <View style={styles.tenderRow}>
-                    <Text style={styles.tenderLabel}>🧾 Total Transactions</Text>
+                    <Text style={styles.tenderLabel}>Total Transactions</Text>
                     <Text style={styles.tenderVal}>{shift.transactionCount}</Text>
                   </View>
                 </View>
@@ -247,66 +247,69 @@ export const ShiftReadingModal: React.FC<ShiftReadingModalProps> = ({
                     >
                       <Text style={styles.diffText}>
                         {cashDifference >= 0
-                          ? `✓ CASH BALANCED / OVER: +P${cashDifference.toFixed(2)}`
-                          : `⚠ CASH SHORTAGE: -P${Math.abs(cashDifference).toFixed(2)}`}
+                          ? `Balanced / Over: +P${cashDifference.toFixed(2)}`
+                          : `Cash Shortage: -P${Math.abs(cashDifference).toFixed(2)}`}
                       </Text>
                     </View>
                   )}
                 </View>
               </View>
             ) : (
-              /* Z-Read End of Day Summary */
+              /* Z-Read Daily Summary */
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Daily Cumulative Summary (All Shifts Today)</Text>
+                <Text style={styles.sectionTitle}>Daily Cumulative Summary</Text>
                 <View style={styles.metricGrid}>
                   <View style={styles.metricBox}>
-                    <Text style={styles.metricLabel}>Previous Grand Total</Text>
-                    <Text style={styles.metricValue}>P{cumulativeGrandTotal.toFixed(2)}</Text>
-                  </View>
-                  <View style={styles.metricBox}>
-                    <Text style={styles.metricLabel}>Today's Gross Sales</Text>
-                    <Text style={[styles.metricValue, { color: '#10B981' }]}>
-                      P{daily.grossSales.toFixed(2)}
-                    </Text>
-                  </View>
-                  <View style={styles.metricBox}>
-                    <Text style={styles.metricLabel}>New Grand Total</Text>
-                    <Text style={[styles.metricValue, { color: '#38BDF8' }]}>
-                      P{(cumulativeGrandTotal + daily.grossSales).toFixed(2)}
-                    </Text>
-                  </View>
-                  <View style={styles.metricBox}>
-                    <Text style={styles.metricLabel}>Customers Served</Text>
+                    <Text style={styles.metricLabel}>Total Txns</Text>
                     <Text style={styles.metricValue}>{daily.transactionCount}</Text>
+                  </View>
+                  <View style={styles.metricBox}>
+                    <Text style={styles.metricLabel}>Discounts</Text>
+                    <Text style={[styles.metricValue, { color: '#F59E0B' }]}>-P{daily.discounts.toFixed(2)}</Text>
+                  </View>
+                  <View style={styles.metricBox}>
+                    <Text style={styles.metricLabel}>Gross Sales</Text>
+                    <Text style={styles.metricValue}>P{daily.grossSales.toFixed(2)}</Text>
+                  </View>
+                  <View style={styles.metricBox}>
+                    <Text style={styles.metricLabel}>Net Sales</Text>
+                    <Text style={[styles.metricValue, { color: '#10B981' }]}>
+                      P{daily.netSales.toFixed(2)}
+                    </Text>
                   </View>
                 </View>
 
+                {/* BIR Tax & Tender Breakdown */}
                 <Text style={[styles.sectionTitle, { marginTop: 14 }]}>Tax & Tender Totals</Text>
                 <View style={styles.tenderList}>
                   <View style={styles.tenderRow}>
-                    <Text style={styles.tenderLabel}>VATable Sales (12%)</Text>
+                    <Text style={styles.tenderLabel}>VATable Sales</Text>
                     <Text style={styles.tenderVal}>P{daily.vatableSales.toFixed(2)}</Text>
+                  </View>
+                  <View style={styles.tenderRow}>
+                    <Text style={styles.tenderLabel}>VAT-Exempt Sales</Text>
+                    <Text style={styles.tenderVal}>P{daily.vatExemptSales.toFixed(2)}</Text>
                   </View>
                   <View style={styles.tenderRow}>
                     <Text style={styles.tenderLabel}>12% VAT Amount</Text>
                     <Text style={styles.tenderVal}>P{daily.vatAmount.toFixed(2)}</Text>
                   </View>
                   <View style={styles.tenderRow}>
-                    <Text style={styles.tenderLabel}>💵 Cash Sales</Text>
+                    <Text style={styles.tenderLabel}>Cash Sales</Text>
                     <Text style={styles.tenderVal}>P{daily.cashTotal.toFixed(2)}</Text>
                   </View>
                   <View style={styles.tenderRow}>
-                    <Text style={styles.tenderLabel}>💳 Card Sales</Text>
+                    <Text style={styles.tenderLabel}>Card Sales</Text>
                     <Text style={styles.tenderVal}>P{daily.cardTotal.toFixed(2)}</Text>
                   </View>
                   <View style={styles.tenderRow}>
-                    <Text style={styles.tenderLabel}>📱 GCash / Maya Sales</Text>
+                    <Text style={styles.tenderLabel}>GCash / Maya Sales</Text>
                     <Text style={styles.tenderVal}>
                       P{(daily.gcashTotal + daily.mayaTotal).toFixed(2)}
                     </Text>
                   </View>
                   <View style={styles.tenderRow}>
-                    <Text style={styles.tenderLabel}>🏷 Member Points Redeemed</Text>
+                    <Text style={styles.tenderLabel}>Member Points Redeemed</Text>
                     <Text style={styles.tenderVal}>P{daily.pointsTotal.toFixed(2)}</Text>
                   </View>
                 </View>
@@ -330,7 +333,7 @@ export const ShiftReadingModal: React.FC<ShiftReadingModalProps> = ({
               onPress={isXRead ? handlePrintXReading : handlePrintZReading}
             >
               <Text style={styles.printBtnText}>
-                🖨 Print {isXRead ? 'X-Reading' : 'Z-Reading'} Slip
+                Print {isXRead ? 'X-Reading' : 'Z-Reading'} Slip
               </Text>
             </TouchableOpacity>
 
@@ -339,7 +342,7 @@ export const ShiftReadingModal: React.FC<ShiftReadingModalProps> = ({
               onPress={handleConfirmClose}
             >
               <Text style={styles.closeActionText}>
-                {isXRead ? '✓ Close Shift & Switch Cashier' : '🛑 Finalize & Close Store'}
+                {isXRead ? 'Close Shift & Handover' : 'Finalize & Close Store'}
               </Text>
             </TouchableOpacity>
           </View>

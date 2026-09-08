@@ -1,4 +1,4 @@
-﻿import React, { useState } from "react";
+import React, { useState } from "react";
 import {
   StyleSheet, View, Text, TouchableOpacity, ScrollView, Alert, Switch,
 } from "react-native";
@@ -48,7 +48,7 @@ export const DatabaseBackupScreen: React.FC = () => {
         </View>
         <Text style={styles.cardSub}>Last backup: {new Date(lastBackup).toLocaleString()}</Text>
         <TouchableOpacity style={styles.backupNowBtn} onPress={handleManualBackup}>
-          <Text style={styles.backupNowText}>🗄 BACKUP NOW</Text>
+          <Text style={styles.backupNowText}>Create Backup Snapshot</Text>
         </TouchableOpacity>
       </View>
 

@@ -136,7 +136,7 @@ export const POSScreen: React.FC<POSScreenProps> = ({
     const member = findMemberByBarcode(cleaned);
     if (member) {
       setCustomerInfo(member.fullName);
-      Alert.alert("👤 Member Identified", `${member.fullName}\nBalance: ₱${member.currentPointsBalance.toFixed(2)}`);
+      Alert.alert("Member Verified", `${member.fullName}\nBalance: ₱${member.currentPointsBalance.toFixed(2)}`);
       setBarcodeInput("");
       return;
     }
@@ -240,14 +240,13 @@ export const POSScreen: React.FC<POSScreenProps> = ({
           <Text style={styles.logoB}>b</Text>
           <Text style={styles.logoC}>c</Text>
           <View style={styles.logoTextWrap}>
-            <Text style={styles.logoPOS}>POS</Text>
-            <Text style={styles.logoSub}>FOOD BASKETS CORPORATION</Text>
+            <Text style={styles.logoPOS}>FOOD BASKETS</Text>
+            <Text style={styles.logoSub}>POINT OF SALE</Text>
           </View>
         </View>
 
-        {/* Barcode input */}
+        {/* Barcode / Search input */}
         <View style={styles.barcodeWrap}>
-          <Text style={styles.barcodeIcon}>▐▌▌▐▌</Text>
           <TextInput
             ref={barcodeRef}
             style={styles.barcodeInput}
@@ -255,27 +254,39 @@ export const POSScreen: React.FC<POSScreenProps> = ({
             onChangeText={setBarcodeInput}
             onSubmitEditing={handleBarcodeSubmit}
             onKeyPress={({ nativeEvent }) => handleKeyPress(nativeEvent.key)}
-            placeholder="Scan or type barcode..."
+            placeholder="Scan barcode or search products..."
             placeholderTextColor={C.gray400}
             returnKeyType="search"
             autoCorrect={false}
           />
           <TouchableOpacity style={styles.lookupBtn} onPress={handleBarcodeSubmit}>
-            <Text style={styles.lookupBtnText}>ITEM LOOKUP</Text>
+            <Text style={styles.lookupBtnText}>Search</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Right info */}
+        {/* Right info & status chips */}
         <View style={styles.headerRight}>
-          <Text style={styles.headerTime}>{new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}  {new Date().toLocaleDateString("en-PH", { month:"short", day:"numeric", year:"numeric" })}</Text>
-          <View style={styles.cashierRow}>
-            <Text style={styles.cashierName}>{currentUser?.fullName ?? "Cashier"}</Text>
-            <View style={styles.cashierBadge}><View style={styles.greenDot}/><Text style={styles.cashierBadgeText}>{currentUser?.role ?? "Cashier"}</Text></View>
+          <View style={styles.headerTopRow}>
+            <Text style={styles.headerTime}>
+              {new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} · {new Date().toLocaleDateString("en-PH", { month: "short", day: "numeric" })}
+            </Text>
           </View>
-          <View style={styles.headerMeta}>
-            <Text style={[styles.syncBadge, { color: syncColor }]}>{syncLabel}</Text>
-            <TouchableOpacity style={styles.bypassBtn} onPress={handleBypassToggle}>
-              <Text style={styles.bypassBtnText}>{sessionBypassActive || isBypassMode ? "🔓" : "🔒"}</Text>
+          <View style={styles.headerPillsRow}>
+            <View style={styles.cashierBadge}>
+              <View style={styles.greenDot} />
+              <Text style={styles.cashierBadgeText}>{currentUser?.fullName ?? "Cashier"}</Text>
+            </View>
+            <TouchableOpacity style={styles.syncBadge} onPress={() => setSyncModalVisible(true)}>
+              <View style={[styles.statusDot, { backgroundColor: syncColor }]} />
+              <Text style={[styles.syncBadgeText, { color: syncColor }]}>{syncLabel}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.overrideBtn, (sessionBypassActive || isBypassMode) && styles.overrideBtnActive]}
+              onPress={handleBypassToggle}
+            >
+              <Text style={[styles.overrideBtnText, (sessionBypassActive || isBypassMode) && styles.overrideBtnTextActive]}>
+                {sessionBypassActive || isBypassMode ? "Override On" : "Override"}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -286,28 +297,25 @@ export const POSScreen: React.FC<POSScreenProps> = ({
 
         {/* ─── LEFT SIDEBAR ─────────────────────────────────── */}
         <View style={styles.sidebar}>
-          <NavButton icon="🛒" label="Order" active onPress={() => {}} />
-          <NavButton icon="⇄" label="Switch Cashier" onPress={handleSwitchCashier} />
-          <NavButton icon="🖩" label="Calculator" onPress={() => Alert.alert("Calculator", "Calculator opens here.")} />
-          <NavButton icon="•••" label="More" onPress={onOpenMore} />
+          <NavButton label="Register" active onPress={() => {}} />
+          <NavButton label="Shift Handover" onPress={handleSwitchCashier} />
+          <NavButton label="Calculator" onPress={() => Alert.alert("Calculator", "Quick Calculator ready.")} />
+          <NavButton label="More Hub" onPress={onOpenMore} />
 
           <View style={styles.divider} />
-          <Text style={styles.shortcutLabel}>SHORTCUTS</Text>
-          <TouchableOpacity onPress={handleBypassToggle}>
-            <Text style={styles.shortcutLink}>{sessionBypassActive || isBypassMode ? "REMOVE BYPASS (F12)" : "USER BYPASS (F11)"}</Text>
-          </TouchableOpacity>
-          {(sessionBypassActive || isBypassMode) && (
-            <TouchableOpacity onPress={() => { deactivateSessionBypass(); toggleBypassMode(false); }}>
-              <Text style={[styles.shortcutLink, { color: C.red }]}>REMOVE BYPASS (F12)</Text>
-            </TouchableOpacity>
-          )}
+          <View style={styles.sidebarShortcuts}>
+            <Text style={styles.shortcutHeader}>HOTKEYS</Text>
+            <Text style={styles.shortcutItem}>F11 · Override</Text>
+            <Text style={styles.shortcutItem}>Ctrl+P · Payment</Text>
+            <Text style={styles.shortcutItem}>Ctrl+Q · Quantity</Text>
+            <Text style={styles.shortcutItem}>Ctrl+V · Void Item</Text>
+            <Text style={styles.shortcutItem}>F4 · Cancel</Text>
+            <Text style={styles.shortcutItem}>F3 · Refund</Text>
+          </View>
 
           <View style={{ flex: 1 }} />
           <View style={styles.sidebarFooter}>
-            <Text style={styles.logoF}>f</Text>
-            <Text style={styles.logoB}>b</Text>
-            <Text style={styles.logoC}>c</Text>
-            <Text style={styles.versionText}> v1.0</Text>
+            <Text style={styles.versionText}>FoodBaskets POS v1.0</Text>
           </View>
         </View>
 
@@ -316,18 +324,18 @@ export const POSScreen: React.FC<POSScreenProps> = ({
           {/* Table header */}
           <View style={styles.cartHeader}>
             <Text style={[styles.cartHeaderCell, styles.cellQty]}>Qty</Text>
-            <Text style={[styles.cartHeaderCell, styles.cellName]}>Product Name</Text>
+            <Text style={[styles.cartHeaderCell, styles.cellName]}>Item Description</Text>
             <Text style={[styles.cartHeaderCell, styles.cellType]}>Type</Text>
-            <Text style={[styles.cartHeaderCell, styles.cellPrice]}>Unit Price</Text>
-            <Text style={[styles.cartHeaderCell, styles.cellDisc]}>Discount</Text>
+            <Text style={[styles.cartHeaderCell, styles.cellPrice]}>Price</Text>
+            <Text style={[styles.cartHeaderCell, styles.cellDisc]}>Disc</Text>
             <Text style={[styles.cartHeaderCell, styles.cellTotal]}>Total</Text>
           </View>
 
           {/* Cart rows */}
           {items.length === 0 ? (
             <View style={styles.emptyCart}>
-              <Text style={styles.emptyCartIcon}>🛒</Text>
-              <Text style={styles.emptyCartText}>Scan a product to begin</Text>
+              <Text style={styles.emptyCartTitle}>Register Ready</Text>
+              <Text style={styles.emptyCartText}>Scan a barcode or enter an item above</Text>
             </View>
           ) : (
             <FlatList
@@ -343,8 +351,12 @@ export const POSScreen: React.FC<POSScreenProps> = ({
             <View style={{ flex: 1 }} />
             <Text style={styles.stripLabel}>Subtotal</Text>
             <Text style={styles.stripValue}>₱{subtotal.toFixed(2)}</Text>
-            <Text style={[styles.stripLabel, { marginLeft: 16, color: C.green }]}>Discount</Text>
-            <Text style={[styles.stripValue, { color: C.green }]}>-₱{discount.toFixed(2)}</Text>
+            {discount > 0 && (
+              <>
+                <Text style={[styles.stripLabel, { marginLeft: 16, color: C.green }]}>Discount</Text>
+                <Text style={[styles.stripValue, { color: C.green }]}>-₱{discount.toFixed(2)}</Text>
+              </>
+            )}
             <Text style={[styles.stripLabel, { marginLeft: 16 }]}>Tax (12%)</Text>
             <Text style={styles.stripValue}>₱{tax.toFixed(2)}</Text>
           </View>
@@ -354,95 +366,106 @@ export const POSScreen: React.FC<POSScreenProps> = ({
         <View style={styles.orderPanel}>
           <ScrollView showsVerticalScrollIndicator={false}>
 
-            {/* PRICE MODE */}
-            <Text style={styles.panelLabel}>PRICE MODE:</Text>
-            <View style={styles.priceModeRow}>
-              <TouchableOpacity
-                style={[styles.pricePill, priceMode === "RETAIL" && styles.pricePillActive]}
-                onPress={() => setPriceMode("RETAIL")}
-              >
-                <Text style={[styles.pricePillText, priceMode === "RETAIL" && styles.pricePillTextActive]}>RETAIL</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.pricePill, priceMode === "WHOLESALE" && styles.pricePillActive, !can("PRICE_MODE_WHOLESALE") && styles.disabledBtn]}
-                onPress={() => can("PRICE_MODE_WHOLESALE") ? setPriceMode("WHOLESALE") : Alert.alert("Access Denied", "Wholesale pricing requires Supervisor access.")}
-              >
-                <Text style={[styles.pricePillText, priceMode === "WHOLESALE" && styles.pricePillTextActive]}>WHOLESALE</Text>
-              </TouchableOpacity>
+            {/* Price Tier Toggle */}
+            <View style={styles.priceModeWrap}>
+              <Text style={styles.panelLabel}>PRICE TIER</Text>
+              <View style={styles.segmentedControl}>
+                <TouchableOpacity
+                  style={[styles.segTab, priceMode === "RETAIL" && styles.segTabActive]}
+                  onPress={() => setPriceMode("RETAIL")}
+                >
+                  <Text style={[styles.segTabText, priceMode === "RETAIL" && styles.segTabTextActive]}>Retail</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.segTab, priceMode === "WHOLESALE" && styles.segTabActive, !can("PRICE_MODE_WHOLESALE") && styles.disabledBtn]}
+                  onPress={() => can("PRICE_MODE_WHOLESALE") ? setPriceMode("WHOLESALE") : Alert.alert("Access Denied", "Wholesale tier requires supervisor override.")}
+                >
+                  <Text style={[styles.segTabText, priceMode === "WHOLESALE" && styles.segTabTextActive]}>Wholesale</Text>
+                </TouchableOpacity>
+              </View>
             </View>
 
-            {/* Action buttons grid */}
+            {/* Quick Action Grid */}
             <View style={styles.actionGrid}>
-              <ActionBtn label="DISCOUNT" sublabel="CTRL+2" color={C.amber} disabled={!can("DISCOUNT_TRANSACTION")}
+              <ActionBtn label="Discount" sublabel="Ctrl+2" color={C.amber} disabled={!can("DISCOUNT_TRANSACTION")}
                 onPress={() => { setDiscountItemMode(false); setDiscountModalVisible(true); }} />
-              <ActionBtn label="DISCOUNT ITEM" sublabel="CTRL+1" color={C.blue} disabled={!can("DISCOUNT_ITEM")}
+              <ActionBtn label="Line Disc" sublabel="Ctrl+1" color={C.blue} disabled={!can("DISCOUNT_ITEM")}
                 onPress={() => { setDiscountItemMode(true); setDiscountModalVisible(true); }} />
-              <ActionBtn label="CUSTOMER" sublabel="CTRL+C" color={C.blue} disabled={!can("CUSTOMER_ASSIGN")}
+              <ActionBtn label="Customer" sublabel="Ctrl+C" color={C.blue} disabled={!can("CUSTOMER_ASSIGN")}
                 onPress={() => setMemberModalVisible(true)} />
-              <ActionBtn label="QUANTITY" sublabel="CTRL+Q" color={C.blue} disabled={!can("QUANTITY_CHANGE")}
+              <ActionBtn label="Quantity" sublabel="Ctrl+Q" color={C.blue} disabled={!can("QUANTITY_CHANGE")}
                 onPress={() => {
-                  if (!selectedItemId) { Alert.alert("Select Item", "Tap an item in the cart first."); return; }
-                  Alert.prompt?.("Quantity", "Enter new quantity:", (v) => {
+                  if (!selectedItemId) { Alert.alert("Select Item", "Select an item from the cart first."); return; }
+                  Alert.prompt?.("Quantity", "Enter quantity:", (v) => {
                     const q = parseInt(v ?? "");
                     if (!isNaN(q) && q > 0) updateQuantity(selectedItemId, q);
                   });
                 }} />
             </View>
+
             <TouchableOpacity
               style={[styles.voidBtn, !can("VOID_ITEM") && styles.disabledBtn]}
               onPress={() => {
-                if (!selectedItemId) { Alert.alert("Select Item", "Tap an item to void it."); return; }
+                if (!selectedItemId) { Alert.alert("Select Item", "Select an item to void."); return; }
                 handleItemVoid(selectedItemId);
               }}
             >
-              <Text style={styles.voidBtnText}>VOID ITEM (CTRL+V)</Text>
+              <Text style={styles.voidBtnText}>Void Selected Item (Ctrl+V)</Text>
             </TouchableOpacity>
 
-            <View style={styles.panelDivider} />
-
-            {/* ORDER SUMMARY */}
-            <Text style={styles.summaryTitle}>Order Summary</Text>
-            <View style={styles.summaryRow}><Text style={styles.summaryLabel}>Order No.</Text><Text style={styles.summaryValue}>{orderNo}</Text></View>
-            <View style={styles.summaryRow}><Text style={styles.summaryLabel}>No. of Items</Text><Text style={styles.summaryValue}>{items.reduce((s,i)=>s+i.quantity,0)}</Text></View>
-            <View style={styles.summaryRow}><Text style={styles.summaryLabel}>Subtotal</Text><Text style={styles.summaryValue}>₱{subtotal.toFixed(2)}</Text></View>
-            <View style={styles.summaryRow}><Text style={styles.summaryLabel}>Discount</Text><Text style={[styles.summaryValue,{color:C.green}]}>-₱{discount.toFixed(2)}</Text></View>
-
-            <View style={styles.totalRow}>
-              <Text style={styles.totalLabel}>TOTAL:</Text>
-              <Text style={styles.totalValue}>₱{total.toFixed(2)}</Text>
+            {/* Order Summary Card */}
+            <View style={styles.summaryCard}>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Ticket</Text>
+                <Text style={styles.summaryValue}>{orderNo}</Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Total Items</Text>
+                <Text style={styles.summaryValue}>{items.reduce((s, i) => s + i.quantity, 0)}</Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Subtotal</Text>
+                <Text style={styles.summaryValue}>₱{subtotal.toFixed(2)}</Text>
+              </View>
+              {discount > 0 && (
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>Discount</Text>
+                  <Text style={[styles.summaryValue, { color: C.green }]}>-₱{discount.toFixed(2)}</Text>
+                </View>
+              )}
+              <View style={styles.summaryDivider} />
+              <View style={styles.totalRow}>
+                <Text style={styles.totalLabel}>Total Due</Text>
+                <Text style={styles.totalValue}>₱{total.toFixed(2)}</Text>
+              </View>
             </View>
 
-            {/* Action row buttons */}
+            {/* Secondary Controls */}
             <View style={styles.miniGrid}>
-              <MiniBtn label="REDEEM ITEM" color={C.green} disabled={!can("REDEEM_POINTS")} onPress={() => Alert.alert("Redeem","Redeem points flow.")} />
-              <MiniBtn label="CANCEL (F4)" color={C.red} disabled={!can("CANCEL_TRANSACTION")} onPress={() => { if(items.length>0) { clearCart(); Alert.alert("Cancelled","Transaction cancelled."); } }} />
-              <MiniBtn label="REFUND (F3)" color={C.orange} disabled={!can("REFUND")} onPress={() => setReturnModalVisible(true)} />
-              <MiniBtn label="HOLD (CTRL+K)" color={C.blue} disabled={!can("HOLD_CART")} onPress={handleHold} />
-              <MiniBtn label="RETRIEVE" color={C.blue} disabled={!can("RETRIEVE_CART")} onPress={() => setHeldCartsModalVisible(true)} />
+              <MiniBtn label="Hold" color={C.blue} disabled={!can("HOLD_CART")} onPress={handleHold} />
+              <MiniBtn label="Recall" color={C.blue} disabled={!can("RETRIEVE_CART")} onPress={() => setHeldCartsModalVisible(true)} />
+              <MiniBtn label="Refund" color={C.orange} disabled={!can("REFUND")} onPress={() => setReturnModalVisible(true)} />
+              <MiniBtn label="Cancel" color={C.red} disabled={!can("CANCEL_TRANSACTION")} onPress={() => { if (items.length > 0) { clearCart(); Alert.alert("Cancelled", "Transaction cancelled."); } }} />
             </View>
 
-            {/* PAYMENT */}
-            <TouchableOpacity style={styles.payBtn} onPress={() => { if (items.length > 0 && onNavigateToCheckout) onNavigateToCheckout(); }}>
-              <Text style={styles.payBtnText}>PAYMENT (CTRL+P)</Text>
-              <Text style={styles.payBtnAmount}>₱{total.toFixed(2)}</Text>
+            {/* Primary Action Button */}
+            <TouchableOpacity
+              style={[styles.payBtn, items.length === 0 && styles.disabledBtn]}
+              disabled={items.length === 0}
+              onPress={() => { if (items.length > 0 && onNavigateToCheckout) onNavigateToCheckout(); }}
+            >
+              <Text style={styles.payBtnText}>Pay  ₱{total.toFixed(2)}</Text>
+              <Text style={styles.payBtnSub}>Ctrl+P</Text>
             </TouchableOpacity>
 
-            {/* DELIVER */}
-            <TouchableOpacity style={styles.deliverBtn} onPress={() => Alert.alert("Deliver","Set Delivery Report # flow.")}>
-              <Text style={styles.deliverBtnText}>DELIVER (CTRL+O)</Text>
+            {/* Delivery Order Button */}
+            <TouchableOpacity
+              style={styles.deliverBtn}
+              onPress={() => Alert.alert("Delivery", "Record Delivery Report (DR) flow.")}
+            >
+              <Text style={styles.deliverBtnText}>Delivery Receipt (DR)</Text>
             </TouchableOpacity>
 
-            {/* Small utilities */}
-            <View style={{ height: 8 }} />
-            <TouchableOpacity style={styles.utilBtn} onPress={() => setHardwareModalVisible(true)}>
-              <Text style={styles.utilBtnText}>⚙ Hardware / Drawer</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.utilBtn} onPress={() => setSyncModalVisible(true)}>
-              <Text style={styles.utilBtnText}>🔄 Sync Status</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.utilBtn} onPress={() => setAuditModalVisible(true)}>
-              <Text style={styles.utilBtnText}>🛡 Security Audit</Text>
-            </TouchableOpacity>
           </ScrollView>
         </View>
       </View>
@@ -466,10 +489,9 @@ export const POSScreen: React.FC<POSScreenProps> = ({
 };
 
 // ─── Sub-components ───────────────────────────────────────────
-const NavButton: React.FC<{ icon: string; label: string; active?: boolean; onPress?: () => void }> =
-  ({ icon, label, active, onPress }) => (
+const NavButton: React.FC<{ label: string; active?: boolean; onPress?: () => void }> =
+  ({ label, active, onPress }) => (
     <TouchableOpacity style={[styles.navBtn, active && styles.navBtnActive]} onPress={onPress}>
-      <Text style={styles.navBtnIcon}>{icon}</Text>
       <Text style={[styles.navBtnLabel, active && styles.navBtnLabelActive]}>{label}</Text>
     </TouchableOpacity>
   );
@@ -493,99 +515,100 @@ const MiniBtn: React.FC<{ label: string; color: string; disabled?: boolean; onPr
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.navy },
   // Header
-  header: { flexDirection: "row", alignItems: "center", backgroundColor: C.navyDark, paddingHorizontal: 12, paddingVertical: 8, gap: 8 },
+  header: { flexDirection: "row", alignItems: "center", backgroundColor: C.navyDark, paddingHorizontal: 16, paddingVertical: 10, gap: 12 },
   logoWrap: { flexDirection: "row", alignItems: "center" },
-  logoF: { fontSize: 28, fontWeight: "900", color: "#2d7a2d" },
-  logoB: { fontSize: 28, fontWeight: "900", color: "#e05020" },
-  logoC: { fontSize: 28, fontWeight: "900", color: "#f5c518" },
-  logoTextWrap: { marginLeft: 4 },
-  logoPOS: { fontSize: 14, fontWeight: "700", color: C.white },
-  logoSub: { fontSize: 8, color: C.gray400, letterSpacing: 0.5 },
-  barcodeWrap: { flex: 1, flexDirection: "row", alignItems: "center", backgroundColor: C.white, borderRadius: 8, paddingHorizontal: 10, marginHorizontal: 8 },
-  barcodeIcon: { fontSize: 12, color: C.gray400, marginRight: 6, letterSpacing: -2 },
-  barcodeInput: { flex: 1, height: 40, fontSize: 15, color: C.navyDark },
-  lookupBtn: { backgroundColor: C.orange, borderRadius: 6, paddingHorizontal: 14, paddingVertical: 8 },
+  logoF: { fontSize: 26, fontWeight: "900", color: "#2d7a2d" },
+  logoB: { fontSize: 26, fontWeight: "900", color: "#e05020" },
+  logoC: { fontSize: 26, fontWeight: "900", color: "#f5c518" },
+  logoTextWrap: { marginLeft: 8 },
+  logoPOS: { fontSize: 13, fontWeight: "800", color: C.white, letterSpacing: 0.5 },
+  logoSub: { fontSize: 8, color: C.gray400, letterSpacing: 1 },
+  barcodeWrap: { flex: 1, flexDirection: "row", alignItems: "center", backgroundColor: C.white, borderRadius: 8, paddingHorizontal: 12, marginHorizontal: 8, height: 42 },
+  barcodeInput: { flex: 1, height: 42, fontSize: 14, color: C.navyDark },
+  lookupBtn: { backgroundColor: C.orange, borderRadius: 6, paddingHorizontal: 16, paddingVertical: 8 },
   lookupBtnText: { color: C.white, fontWeight: "700", fontSize: 12 },
-  headerRight: { alignItems: "flex-end" },
-  headerTime: { fontSize: 12, color: C.white, fontWeight: "600" },
-  cashierRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 },
-  cashierName: { fontSize: 12, color: C.white },
-  cashierBadge: { flexDirection: "row", alignItems: "center", backgroundColor: "#243050", borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 },
-  greenDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "#4caf50", marginRight: 4 },
-  cashierBadgeText: { fontSize: 10, color: C.white },
-  headerMeta: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 2 },
-  syncBadge: { fontSize: 10, fontWeight: "600" },
-  bypassBtn: { backgroundColor: C.orange, borderRadius: 16, width: 32, height: 32, alignItems: "center", justifyContent: "center" },
-  bypassBtnText: { fontSize: 14 },
+  headerRight: { alignItems: "flex-end", gap: 4 },
+  headerTopRow: { flexDirection: "row", alignItems: "center" },
+  headerTime: { fontSize: 11, color: C.gray400, fontWeight: "500" },
+  headerPillsRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  cashierBadge: { flexDirection: "row", alignItems: "center", backgroundColor: "#1e2d50", borderRadius: 14, paddingHorizontal: 10, paddingVertical: 4 },
+  greenDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "#4caf50", marginRight: 6 },
+  cashierBadgeText: { fontSize: 11, color: C.white, fontWeight: "600" },
+  syncBadge: { flexDirection: "row", alignItems: "center", backgroundColor: "#1e2d50", borderRadius: 14, paddingHorizontal: 10, paddingVertical: 4 },
+  statusDot: { width: 6, height: 6, borderRadius: 3, marginRight: 6 },
+  syncBadgeText: { fontSize: 11, fontWeight: "600" },
+  overrideBtn: { borderWidth: 1, borderColor: "#2d3f6a", borderRadius: 14, paddingHorizontal: 10, paddingVertical: 4 },
+  overrideBtnActive: { backgroundColor: C.orange, borderColor: C.orange },
+  overrideBtnText: { fontSize: 11, color: C.gray400, fontWeight: "600" },
+  overrideBtnTextActive: { color: C.white },
 
   // Body
   body: { flex: 1, flexDirection: "row" },
 
   // Sidebar
-  sidebar: { width: 190, backgroundColor: C.navySide, paddingTop: 8, paddingBottom: 8, paddingHorizontal: 6 },
-  navBtn: { flexDirection: "row", alignItems: "center", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 14, marginBottom: 4, backgroundColor: "#243050" },
+  sidebar: { width: 170, backgroundColor: C.navySide, paddingTop: 10, paddingBottom: 10, paddingHorizontal: 8 },
+  navBtn: { borderRadius: 8, paddingHorizontal: 12, paddingVertical: 12, marginBottom: 6, backgroundColor: "#1a2542" },
   navBtnActive: { backgroundColor: C.green },
-  navBtnIcon: { fontSize: 18, marginRight: 10 },
-  navBtnLabel: { fontSize: 14, color: C.white, fontWeight: "600" },
-  navBtnLabelActive: { color: C.white },
-  divider: { height: 1, backgroundColor: "#2d3f6a", marginVertical: 8 },
-  shortcutLabel: { fontSize: 9, color: C.gray400, letterSpacing: 1, marginBottom: 4, marginLeft: 4 },
-  shortcutLink: { fontSize: 11, color: C.gray400, textDecorationLine: "underline", marginBottom: 4, marginLeft: 4 },
-  sidebarFooter: { flexDirection: "row", alignItems: "center", justifyContent: "center", paddingTop: 8 },
-  versionText: { fontSize: 11, color: C.gray400 },
+  navBtnLabel: { fontSize: 13, color: C.gray400, fontWeight: "600" },
+  navBtnLabelActive: { color: C.white, fontWeight: "700" },
+  divider: { height: 1, backgroundColor: "#2d3f6a", marginVertical: 10 },
+  sidebarShortcuts: { paddingHorizontal: 4 },
+  shortcutHeader: { fontSize: 9, color: C.gray400, letterSpacing: 1, fontWeight: "700", marginBottom: 6 },
+  shortcutItem: { fontSize: 10, color: "#8a97ab", marginBottom: 4 },
+  sidebarFooter: { alignItems: "center", paddingBottom: 4 },
+  versionText: { fontSize: 10, color: "#62718a" },
 
   // Cart
   cartArea: { flex: 1, backgroundColor: C.gray100, margin: 8, borderRadius: 10, overflow: "hidden" },
-  cartHeader: { flexDirection: "row", backgroundColor: C.green, paddingVertical: 10, paddingHorizontal: 8 },
+  cartHeader: { flexDirection: "row", backgroundColor: "#1f2b48", paddingVertical: 10, paddingHorizontal: 8 },
   cartHeaderCell: { color: C.white, fontWeight: "700", fontSize: 12 },
-  cartRow: { flexDirection: "row", paddingVertical: 10, paddingHorizontal: 8, borderBottomWidth: 1, borderBottomColor: C.gray200 },
-  cartRowAlt: { backgroundColor: C.greenLight },
-  cartRowSelected: { backgroundColor: "#c8e6c9", borderLeftWidth: 3, borderLeftColor: C.green },
+  cartRow: { flexDirection: "row", paddingVertical: 10, paddingHorizontal: 8, borderBottomWidth: 1, borderBottomColor: C.gray200, backgroundColor: C.white },
+  cartRowAlt: { backgroundColor: "#f8fafc" },
+  cartRowSelected: { backgroundColor: "#e8f5e9", borderLeftWidth: 3, borderLeftColor: C.green },
   cartCell: { fontSize: 12, color: C.gray600 },
-  cellQty: { width: 36, textAlign: "center" },
-  cellName: { flex: 1 },
-  cellType: { width: 64, textAlign: "center" },
+  cellQty: { width: 40, textAlign: "center", fontWeight: "700", color: C.navy },
+  cellName: { flex: 1, fontWeight: "500", color: C.navy },
+  cellType: { width: 64, textAlign: "center", color: C.gray400 },
   cellPrice: { width: 80, textAlign: "right" },
-  cellDisc: { width: 72, textAlign: "right" },
-  cellTotal: { width: 80, textAlign: "right", fontWeight: "600" },
+  cellDisc: { width: 72, textAlign: "right", color: C.green },
+  cellTotal: { width: 84, textAlign: "right", fontWeight: "700", color: C.navy },
   emptyCart: { flex: 1, alignItems: "center", justifyContent: "center" },
-  emptyCartIcon: { fontSize: 48, marginBottom: 8 },
-  emptyCartText: { fontSize: 14, color: C.gray400 },
-  cartSummaryStrip: { flexDirection: "row", alignItems: "center", backgroundColor: C.white, paddingVertical: 8, paddingHorizontal: 12, borderTopWidth: 1, borderTopColor: C.gray200 },
+  emptyCartTitle: { fontSize: 16, fontWeight: "700", color: C.navy, marginBottom: 4 },
+  emptyCartText: { fontSize: 13, color: C.gray400 },
+  cartSummaryStrip: { flexDirection: "row", alignItems: "center", backgroundColor: C.white, paddingVertical: 10, paddingHorizontal: 14, borderTopWidth: 1, borderTopColor: C.gray200 },
   stripLabel: { fontSize: 12, color: C.gray600 },
   stripValue: { fontSize: 12, fontWeight: "700", color: C.navyDark, marginLeft: 6 },
 
   // Right panel
-  orderPanel: { width: 286, backgroundColor: C.white, margin: 8, borderRadius: 10, padding: 12 },
-  panelLabel: { fontSize: 10, color: C.gray400, letterSpacing: 1, marginBottom: 6 },
-  priceModeRow: { flexDirection: "row", gap: 6, marginBottom: 10 },
-  pricePill: { flex: 1, borderRadius: 20, borderWidth: 1.5, borderColor: C.gray400, paddingVertical: 7, alignItems: "center" },
-  pricePillActive: { backgroundColor: C.green, borderColor: C.green },
-  pricePillText: { fontSize: 12, fontWeight: "700", color: C.gray400 },
-  pricePillTextActive: { color: C.white },
+  orderPanel: { width: 290, backgroundColor: C.white, margin: 8, borderRadius: 10, padding: 12 },
+  priceModeWrap: { marginBottom: 10 },
+  panelLabel: { fontSize: 10, color: C.gray600, letterSpacing: 0.8, fontWeight: "700", marginBottom: 4 },
+  segmentedControl: { flexDirection: "row", backgroundColor: C.gray100, borderRadius: 8, padding: 2, borderWidth: 1, borderColor: C.gray200 },
+  segTab: { flex: 1, paddingVertical: 6, alignItems: "center", borderRadius: 6 },
+  segTabActive: { backgroundColor: C.green },
+  segTabText: { fontSize: 12, fontWeight: "600", color: C.gray600 },
+  segTabTextActive: { color: C.white, fontWeight: "700" },
   actionGrid: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginBottom: 6 },
-  actionBtn: { width: "47%", borderRadius: 8, paddingVertical: 10, paddingHorizontal: 6, alignItems: "center" },
+  actionBtn: { width: "48%", borderRadius: 8, paddingVertical: 9, paddingHorizontal: 6, alignItems: "center" },
   actionBtnLabel: { fontSize: 11, fontWeight: "700", color: C.white },
-  actionBtnSub: { fontSize: 9, color: "rgba(255,255,255,0.7)", marginTop: 2 },
-  voidBtn: { backgroundColor: "#b71c1c", borderRadius: 8, paddingVertical: 10, alignItems: "center", marginBottom: 6 },
-  voidBtnText: { fontSize: 12, fontWeight: "700", color: C.white },
-  panelDivider: { height: 1, backgroundColor: C.gray200, marginVertical: 10 },
-  summaryTitle: { fontSize: 13, fontWeight: "700", color: C.navyDark, marginBottom: 6 },
-  summaryRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 3 },
+  actionBtnSub: { fontSize: 9, color: "rgba(255,255,255,0.75)", marginTop: 1 },
+  voidBtn: { backgroundColor: "#dc2626", borderRadius: 8, paddingVertical: 9, alignItems: "center", marginBottom: 10 },
+  voidBtnText: { fontSize: 11, fontWeight: "700", color: C.white },
+  summaryCard: { backgroundColor: C.gray100, borderRadius: 8, padding: 10, marginBottom: 10, borderWidth: 1, borderColor: C.gray200 },
+  summaryRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 4 },
   summaryLabel: { fontSize: 12, color: C.gray600 },
   summaryValue: { fontSize: 12, fontWeight: "600", color: C.navyDark },
-  totalRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 8, marginBottom: 10 },
-  totalLabel: { fontSize: 20, fontWeight: "900", color: C.navyDark },
-  totalValue: { fontSize: 22, fontWeight: "900", color: C.navyDark },
-  miniGrid: { flexDirection: "row", flexWrap: "wrap", gap: 5, marginBottom: 10 },
-  miniBtn: { borderWidth: 1.5, borderRadius: 6, paddingVertical: 7, paddingHorizontal: 6, alignItems: "center", minWidth: "47%", flex: 1 },
+  summaryDivider: { height: 1, backgroundColor: C.gray200, marginVertical: 6 },
+  totalRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  totalLabel: { fontSize: 16, fontWeight: "800", color: C.navyDark },
+  totalValue: { fontSize: 20, fontWeight: "900", color: C.navyDark },
+  miniGrid: { flexDirection: "row", gap: 5, marginBottom: 10 },
+  miniBtn: { borderWidth: 1.5, borderRadius: 6, paddingVertical: 7, paddingHorizontal: 4, alignItems: "center", flex: 1 },
   miniBtnText: { fontSize: 10, fontWeight: "700" },
-  payBtn: { backgroundColor: C.green, borderRadius: 10, paddingVertical: 14, alignItems: "center", marginBottom: 6 },
-  payBtnText: { color: C.white, fontWeight: "700", fontSize: 14 },
-  payBtnAmount: { color: C.white, fontWeight: "900", fontSize: 18 },
-  deliverBtn: { backgroundColor: C.blue, borderRadius: 8, paddingVertical: 10, alignItems: "center", marginBottom: 4 },
-  deliverBtnText: { color: C.white, fontWeight: "700", fontSize: 13 },
-  utilBtn: { paddingVertical: 6, paddingHorizontal: 4, marginBottom: 2 },
-  utilBtnText: { fontSize: 11, color: C.gray600 },
+  payBtn: { backgroundColor: C.green, borderRadius: 8, paddingVertical: 12, alignItems: "center", marginBottom: 6 },
+  payBtnText: { color: C.white, fontWeight: "800", fontSize: 16 },
+  payBtnSub: { color: "rgba(255,255,255,0.7)", fontSize: 10, marginTop: 1 },
+  deliverBtn: { backgroundColor: "#1e2d50", borderRadius: 8, paddingVertical: 9, alignItems: "center" },
+  deliverBtnText: { color: C.white, fontWeight: "600", fontSize: 12 },
   disabledBtn: { opacity: 0.45 },
 });

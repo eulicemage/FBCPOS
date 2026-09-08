@@ -118,13 +118,13 @@ export const MoreMenuScreen: React.FC<MoreMenuScreenProps> = ({ onClose, onSwitc
   const handleExport = (reportName: string, headers: string[], rows: (string | number)[][]) => {
     const csv = ExcelService.exportTableToCsv(reportName, headers, rows);
     Alert.alert(
-      "📥 Report Exported",
+      "Report Exported",
       `"${reportName}" exported successfully as CSV.\n${rows.length} rows processed.`
     );
   };
 
   // Sidebar item renderer
-  const renderSidebarItem = (title: string, view: ActiveView, icon: string) => {
+  const renderSidebarItem = (title: string, view: ActiveView) => {
     const isActive = activeView === view;
     return (
       <TouchableOpacity
@@ -145,7 +145,6 @@ export const MoreMenuScreen: React.FC<MoreMenuScreenProps> = ({ onClose, onSwitc
           }
         }}
       >
-        <Text style={styles.sidebarIcon}>{icon}</Text>
         <Text style={[styles.sidebarItemText, isActive && styles.sidebarItemTextActive]}>{title}</Text>
       </TouchableOpacity>
     );
@@ -183,12 +182,12 @@ export const MoreMenuScreen: React.FC<MoreMenuScreenProps> = ({ onClose, onSwitc
         return (
           <View style={styles.contentContainer}>
             <View style={styles.headerBar}>
-              <Text style={styles.contentTitle}>🧾 Transaction History</Text>
+              <Text style={styles.contentTitle}>Sales History</Text>
               <TouchableOpacity
                 style={styles.exportTopBtn}
                 onPress={() => handleExport("Transaction History", ["Invoice", "Cashier", "Items", "Payment", "Total", "Date"], salesList.map((s: any) => [s.invoiceNumber, s.cashierName, s.items.length, s.payments?.[0]?.method || "CASH", s.totalAmount.toFixed(2), new Date(s.createdAt).toLocaleString()]))}
               >
-                <Text style={styles.exportTopText}>📥 Export to CSV</Text>
+                <Text style={styles.exportTopText}>Export CSV</Text>
               </TouchableOpacity>
             </View>
 
@@ -233,12 +232,12 @@ export const MoreMenuScreen: React.FC<MoreMenuScreenProps> = ({ onClose, onSwitc
         return (
           <View style={styles.contentContainer}>
             <View style={styles.headerBar}>
-              <Text style={styles.contentTitle}>📋 Terminal Sales Record</Text>
+              <Text style={styles.contentTitle}>Terminal Sales Summary</Text>
               <TouchableOpacity
                 style={styles.exportTopBtn}
                 onPress={() => handleExport("Terminal Records", ["Terminal", "Name", "Cashier", "Transactions", "Total Sales"], terminals.map((t) => [t.terminal, t.name, t.activeCashier, t.txnCount, t.sales.toFixed(2)]))}
               >
-                <Text style={styles.exportTopText}>📥 Export</Text>
+                <Text style={styles.exportTopText}>Export CSV</Text>
               </TouchableOpacity>
             </View>
             <View style={styles.tableHeader}>
@@ -268,16 +267,16 @@ export const MoreMenuScreen: React.FC<MoreMenuScreenProps> = ({ onClose, onSwitc
         return (
           <View style={styles.contentContainer}>
             <View style={styles.headerBar}>
-              <Text style={styles.contentTitle}>🚚 Delivery Report (DR# Tracking)</Text>
+              <Text style={styles.contentTitle}>Delivery Records (DR)</Text>
               <View style={{ flexDirection: "row", gap: 8 }}>
                 <TouchableOpacity style={styles.primaryBtn} onPress={() => setShowAddDr(true)}>
-                  <Text style={styles.primaryBtnText}>+ Add Delivery</Text>
+                  <Text style={styles.primaryBtnText}>+ New Delivery</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.exportTopBtn}
                   onPress={() => handleExport("Delivery Reports", ["DR Number", "Supplier", "Date", "Items Count", "Amount"], deliveryRecords.map((d) => [d.drNumber, d.supplier, d.date, d.itemsCount, d.amount.toFixed(2)]))}
                 >
-                  <Text style={styles.exportTopText}>📥 Export</Text>
+                  <Text style={styles.exportTopText}>Export CSV</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -317,12 +316,12 @@ export const MoreMenuScreen: React.FC<MoreMenuScreenProps> = ({ onClose, onSwitc
         return (
           <View style={styles.contentContainer}>
             <View style={styles.headerBar}>
-              <Text style={styles.contentTitle}>👤 Staff Sales Record</Text>
+              <Text style={styles.contentTitle}>Cashier Performance</Text>
               <TouchableOpacity
                 style={styles.exportTopBtn}
                 onPress={() => handleExport("Staff Records", ["Cashier", "Transactions", "Returns", "Total Sales"], staffRecords.map((s) => [s.cashier, s.txnCount, s.returnsCount, s.totalSales.toFixed(2)]))}
               >
-                <Text style={styles.exportTopText}>📥 Export</Text>
+                <Text style={styles.exportTopText}>Export CSV</Text>
               </TouchableOpacity>
             </View>
             <View style={styles.tableHeader}>
@@ -353,12 +352,12 @@ export const MoreMenuScreen: React.FC<MoreMenuScreenProps> = ({ onClose, onSwitc
         return (
           <View style={styles.contentContainer}>
             <View style={styles.headerBar}>
-              <Text style={styles.contentTitle}>{isX ? "📊 X-Reading History (Cashier Shifts)" : "🛑 Z-Reading History (End of Day Closures)"}</Text>
+              <Text style={styles.contentTitle}>{isX ? "Shift Handover History (X-Read)" : "Store Closing History (Z-Read)"}</Text>
               <TouchableOpacity
                 style={styles.exportTopBtn}
                 onPress={() => handleExport(isX ? "X-Readings" : "Z-Readings", ["ID", "Cashier/Manager", "Gross Sales", "Discounts", "Net Sales", "Date"], list.map((item: any) => [item.id, item.cashierName || item.managerName, (item.grossSales || item.todaysGrossSales || 0).toFixed(2), (item.discountAmount || item.todaysDiscounts || 0).toFixed(2), (item.netSales || item.todaysNetSales || 0).toFixed(2), item.openedAt || item.date]))}
               >
-                <Text style={styles.exportTopText}>📥 Export</Text>
+                <Text style={styles.exportTopText}>Export CSV</Text>
               </TouchableOpacity>
             </View>
             <View style={styles.tableHeader}>
@@ -397,12 +396,12 @@ export const MoreMenuScreen: React.FC<MoreMenuScreenProps> = ({ onClose, onSwitc
         return (
           <View style={styles.contentContainer}>
             <View style={styles.headerBar}>
-              <Text style={styles.contentTitle}>% Discounted Transactions</Text>
+              <Text style={styles.contentTitle}>Discounts Summary</Text>
               <TouchableOpacity
                 style={styles.exportTopBtn}
                 onPress={() => handleExport("Discount Report", ["Invoice", "Cashier", "Discount Amount", "Total"], discountSales.map((s: any) => [s.invoiceNumber, s.cashierName, s.discountAmount.toFixed(2), s.totalAmount.toFixed(2)]))}
               >
-                <Text style={styles.exportTopText}>📥 Export</Text>
+                <Text style={styles.exportTopText}>Export CSV</Text>
               </TouchableOpacity>
             </View>
             <View style={styles.tableHeader}>
@@ -441,12 +440,12 @@ export const MoreMenuScreen: React.FC<MoreMenuScreenProps> = ({ onClose, onSwitc
         return (
           <View style={styles.contentContainer}>
             <View style={styles.headerBar}>
-              <Text style={styles.contentTitle}>{isVoid ? "✗ Void Items Log" : "🛡 Security & Privilege Audit Trail"}</Text>
+              <Text style={styles.contentTitle}>{isVoid ? "Voided Items Log" : "Security & Activity Audit Log"}</Text>
               <TouchableOpacity
                 style={styles.exportTopBtn}
                 onPress={() => handleExport(isVoid ? "Void Report" : "Audit Logs", ["Timestamp", "User", "Event", "Severity", "Details"], filteredEvents.map((e) => [new Date(e.timestamp).toLocaleString(), e.userName, e.eventType, e.severity, e.details]))}
               >
-                <Text style={styles.exportTopText}>📥 Export</Text>
+                <Text style={styles.exportTopText}>Export CSV</Text>
               </TouchableOpacity>
             </View>
             <View style={styles.tableHeader}>
@@ -490,12 +489,12 @@ export const MoreMenuScreen: React.FC<MoreMenuScreenProps> = ({ onClose, onSwitc
             department: memDept,
             monthlyAllowance: parseFloat(memAllowance) || 1500,
           });
-          Alert.alert("Success", `Member "${memName}" enrolled.\nAssigned ID Barcode: ${barcode}`);
+          Alert.alert("Success", `Member "${memName}" registered.\nAssigned Barcode: ${barcode}`);
           setMemBarcode(""); setMemName("");
         };
         return (
           <ScrollView style={styles.contentContainer} contentContainerStyle={{ padding: 16 }}>
-            <Text style={styles.contentTitle}>👥 Enroll New Member</Text>
+            <Text style={styles.contentTitle}>Register New Member</Text>
             <Text style={styles.hint}>Scan or type member ID barcode, name, division, and monthly consumable allowance.</Text>
             <View style={styles.formCard}>
               <Text style={styles.fieldLabel}>ID Barcode (leave empty to auto-generate):</Text>
@@ -513,7 +512,7 @@ export const MoreMenuScreen: React.FC<MoreMenuScreenProps> = ({ onClose, onSwitc
               <Text style={styles.fieldLabel}>Monthly Consumable Points Allowance (₱):</Text>
               <TextInput style={styles.input} value={memAllowance} onChangeText={setMemAllowance} keyboardType="numeric" />
               <TouchableOpacity style={styles.primaryBtn} onPress={handleSaveMember}>
-                <Text style={styles.primaryBtnText}>✔ SAVE & ENROLL MEMBER</Text>
+                <Text style={styles.primaryBtnText}>Save Member Profile</Text>
               </TouchableOpacity>
             </View>
           </ScrollView>
@@ -536,7 +535,7 @@ export const MoreMenuScreen: React.FC<MoreMenuScreenProps> = ({ onClose, onSwitc
         };
         return (
           <ScrollView style={styles.contentContainer} contentContainerStyle={{ padding: 16 }}>
-            <Text style={styles.contentTitle}>➕ Add / Top-Up Member Points</Text>
+            <Text style={styles.contentTitle}>Reload Member Points</Text>
             <View style={styles.formCard}>
               <Text style={styles.fieldLabel}>Member Barcode or Name:</Text>
               <TextInput style={styles.input} placeholder="Scan ID card or type name" value={topUpBarcode} onChangeText={setTopUpBarcode} />
@@ -545,7 +544,7 @@ export const MoreMenuScreen: React.FC<MoreMenuScreenProps> = ({ onClose, onSwitc
               <Text style={styles.fieldLabel}>Reason / Allocation Type:</Text>
               <TextInput style={styles.input} value={topUpReason} onChangeText={setTopUpReason} />
               <TouchableOpacity style={styles.primaryBtn} onPress={handleTopUp}>
-                <Text style={styles.primaryBtnText}>✔ PROCESS TOP-UP</Text>
+                <Text style={styles.primaryBtnText}>Credit Points</Text>
               </TouchableOpacity>
             </View>
           </ScrollView>
@@ -564,7 +563,7 @@ export const MoreMenuScreen: React.FC<MoreMenuScreenProps> = ({ onClose, onSwitc
         };
         return (
           <View style={styles.contentContainer}>
-            <Text style={styles.contentTitle}>🏷 Member Categories / Divisions</Text>
+            <Text style={styles.contentTitle}>Member Divisions</Text>
             <View style={[styles.formCard, { marginBottom: 16 }]}>
               <Text style={styles.fieldLabel}>New Division / Department Name:</Text>
               <TextInput style={styles.input} placeholder="e.g. Finance & Accounting" value={divisionName} onChangeText={setDivisionName} />
@@ -595,11 +594,11 @@ export const MoreMenuScreen: React.FC<MoreMenuScreenProps> = ({ onClose, onSwitc
           const pct = parseFloat(discPercent);
           if (isNaN(pct) || pct <= 0) { Alert.alert("Validation", "Enter a positive discount %."); return; }
           addGroupDiscount(discGroupId, pct, new Date().toISOString().slice(0, 10));
-          Alert.alert("Success", `Dynamic discount of ${pct}% activated for group.`);
+          Alert.alert("Success", `Group discount of ${pct}% activated.`);
         };
         return (
           <View style={styles.contentContainer}>
-            <Text style={styles.contentTitle}>🎁 Manage Dynamic Group Discounts</Text>
+            <Text style={styles.contentTitle}>Group Discounts</Text>
             <View style={[styles.formCard, { marginBottom: 16 }]}>
               <Text style={styles.fieldLabel}>Select Division / Group:</Text>
               <View style={styles.pillRow}>
@@ -612,10 +611,10 @@ export const MoreMenuScreen: React.FC<MoreMenuScreenProps> = ({ onClose, onSwitc
               <Text style={styles.fieldLabel}>Discount Percentage (%):</Text>
               <TextInput style={styles.input} value={discPercent} onChangeText={setDiscPercent} keyboardType="numeric" />
               <TouchableOpacity style={styles.primaryBtn} onPress={handleAddGroupDiscount}>
-                <Text style={styles.primaryBtnText}>✔ APPLY DYNAMIC DISCOUNT</Text>
+                <Text style={styles.primaryBtnText}>Apply Discount</Text>
               </TouchableOpacity>
             </View>
-            <Text style={[styles.sectionTitle, { marginBottom: 8 }]}>Active Dynamic Discounts</Text>
+            <Text style={[styles.sectionTitle, { marginBottom: 8 }]}>Active Group Discounts</Text>
             <FlatList
               data={groupDiscounts}
               keyExtractor={(d) => d.id}
@@ -635,12 +634,12 @@ export const MoreMenuScreen: React.FC<MoreMenuScreenProps> = ({ onClose, onSwitc
         return (
           <View style={styles.contentContainer}>
             <View style={styles.headerBar}>
-              <Text style={styles.contentTitle}>📜 Member Top-Up History</Text>
+              <Text style={styles.contentTitle}>Points Reload History</Text>
               <TouchableOpacity
                 style={styles.exportTopBtn}
                 onPress={() => handleExport("Top-Up History", ["Member", "Amount", "Reason", "Performed By", "Timestamp"], topUpHistory.map((t) => [t.memberName, t.amount.toFixed(2), t.reason, t.performedBy, new Date(t.timestamp).toLocaleString()]))}
               >
-                <Text style={styles.exportTopText}>📥 Export</Text>
+                <Text style={styles.exportTopText}>Export CSV</Text>
               </TouchableOpacity>
             </View>
             <View style={styles.tableHeader}>
@@ -678,7 +677,7 @@ export const MoreMenuScreen: React.FC<MoreMenuScreenProps> = ({ onClose, onSwitc
         const handleRecordPay = () => {
           const amt = parseFloat(payAmount);
           if (isNaN(amt) || amt <= 0) { Alert.alert("Validation", "Enter a positive amount."); return; }
-          if (!payReason.trim()) { Alert.alert("Validation", "Enter a reason (e.g. Petty Cash, Cash Float)."); return; }
+          if (!payReason.trim()) { Alert.alert("Validation", "Enter a reason (e.g. Petty Cash, Float)."); return; }
           if (payType === "PAY_IN") {
             addPayIn(amt, payReason.trim(), currentUser?.fullName || "Cashier");
           } else {
@@ -689,7 +688,7 @@ export const MoreMenuScreen: React.FC<MoreMenuScreenProps> = ({ onClose, onSwitc
         };
         return (
           <View style={styles.contentContainer}>
-            <Text style={styles.contentTitle}>💵 Cash Drawer Pay In & Pay Out</Text>
+            <Text style={styles.contentTitle}>Cash Drawer (Pay In / Pay Out)</Text>
             <View style={styles.balanceCard}>
               <Text style={styles.balanceLabel}>Current Computed Drawer Cash Float:</Text>
               <Text style={styles.balanceVal}>₱{getNetBalance().toFixed(2)}</Text>
@@ -697,10 +696,10 @@ export const MoreMenuScreen: React.FC<MoreMenuScreenProps> = ({ onClose, onSwitc
             <View style={[styles.formCard, { marginBottom: 14 }]}>
               <View style={styles.segRow}>
                 <TouchableOpacity style={[styles.segBtn, payType === "PAY_IN" && { backgroundColor: C.green, borderColor: C.green }]} onPress={() => setPayType("PAY_IN")}>
-                  <Text style={[styles.segBtnText, payType === "PAY_IN" && { color: C.white }]}>➕ PAY IN (Add Cash)</Text>
+                  <Text style={[styles.segBtnText, payType === "PAY_IN" && { color: C.white }]}>Pay In (Add Cash)</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={[styles.segBtn, payType === "PAY_OUT" && { backgroundColor: C.red, borderColor: C.red }]} onPress={() => setPayType("PAY_OUT")}>
-                  <Text style={[styles.segBtnText, payType === "PAY_OUT" && { color: C.white }]}>➖ PAY OUT (Remove Cash)</Text>
+                  <Text style={[styles.segBtnText, payType === "PAY_OUT" && { color: C.white }]}>Pay Out (Remove Cash)</Text>
                 </TouchableOpacity>
               </View>
               <Text style={styles.fieldLabel}>Amount (₱):</Text>
@@ -708,10 +707,10 @@ export const MoreMenuScreen: React.FC<MoreMenuScreenProps> = ({ onClose, onSwitc
               <Text style={styles.fieldLabel}>Reason / Notes:</Text>
               <TextInput style={styles.input} placeholder="e.g. Change replenishment, Safe drop, Petty cash" value={payReason} onChangeText={setPayReason} />
               <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: payType === "PAY_IN" ? C.green : C.red }]} onPress={handleRecordPay}>
-                <Text style={styles.primaryBtnText}>RECORD {payType}</Text>
+                <Text style={styles.primaryBtnText}>Record {payType === "PAY_IN" ? "Pay In" : "Pay Out"}</Text>
               </TouchableOpacity>
             </View>
-            <Text style={[styles.sectionTitle, { marginBottom: 6 }]}>Recent Pay In / Pay Out Entries</Text>
+            <Text style={[styles.sectionTitle, { marginBottom: 6 }]}>Recent Drawer Entries</Text>
             <FlatList
               data={entries}
               keyExtractor={(e) => e.id}
@@ -741,7 +740,7 @@ export const MoreMenuScreen: React.FC<MoreMenuScreenProps> = ({ onClose, onSwitc
         };
         return (
           <View style={styles.contentContainer}>
-            <Text style={styles.contentTitle}>💳 Dynamic Payment Methods</Text>
+            <Text style={styles.contentTitle}>Payment Methods</Text>
             <View style={[styles.formCard, { marginBottom: 16 }]}>
               <Text style={styles.fieldLabel}>Payment Method Name (e.g. Maya Wallet):</Text>
               <TextInput style={styles.input} value={pmName} onChangeText={setPmName} />
@@ -752,7 +751,7 @@ export const MoreMenuScreen: React.FC<MoreMenuScreenProps> = ({ onClose, onSwitc
                 <Switch value={pmRefReq} onValueChange={setPmRefReq} trackColor={{ true: C.green }} />
               </View>
               <TouchableOpacity style={styles.primaryBtn} onPress={handleAddMethod}>
-                <Text style={styles.primaryBtnText}>+ ADD PAYMENT METHOD</Text>
+                <Text style={styles.primaryBtnText}>+ Add Payment Method</Text>
               </TouchableOpacity>
             </View>
             <Text style={[styles.sectionTitle, { marginBottom: 8 }]}>Configured Methods</Text>
@@ -790,46 +789,46 @@ export const MoreMenuScreen: React.FC<MoreMenuScreenProps> = ({ onClose, onSwitc
               unitOfMeasure: "PCS",
             });
           }
-          Alert.alert("Excel Import Successful", `Successfully imported ${parsed.successCount} products into database with relaxed schema.`);
+          Alert.alert("Import Successful", `Successfully imported ${parsed.successCount} products into database.`);
         };
 
         const handleExportProducts = () => {
           const csv = ExcelService.exportProductsCsv(products);
-          Alert.alert("Export Complete", `Exported ${products.length} products to Excel CSV format.`);
+          Alert.alert("Export Complete", `Exported ${products.length} products to CSV.`);
         };
 
         const handleExportInventory = () => {
           const csv = ExcelService.exportInventoryCsv(products.map((p) => ({ barcode: p.barcode, name: p.name, quantity: 50, reorderLevel: 10, drNumber: "DR-2026-0901" })));
-          Alert.alert("Inventory Export Complete", "Inventory balances and DR records exported.");
+          Alert.alert("Export Complete", "Inventory balances and DR records exported.");
         };
 
         return (
           <ScrollView style={styles.contentContainer} contentContainerStyle={{ padding: 16 }}>
-            <Text style={styles.contentTitle}>📁 Excel / CSV Database Management</Text>
+            <Text style={styles.contentTitle}>Data Import & Export</Text>
             <Text style={styles.hint}>Bulk import and export products and inventory without manual data entry. Non-required fields automatically fallback to defaults.</Text>
 
             <View style={styles.card}>
-              <Text style={styles.cardTitle}>📦 Products Catalog</Text>
+              <Text style={styles.cardTitle}>Product Catalog</Text>
               <Text style={styles.cardSub}>Import new products from an Excel/CSV file or export existing store catalog.</Text>
               <View style={{ flexDirection: "row", gap: 10, marginTop: 8 }}>
                 <TouchableOpacity style={[styles.primaryBtn, { flex: 1 }]} onPress={handleImportProductsSample}>
-                  <Text style={styles.primaryBtnText}>📥 Import Products (.csv)</Text>
+                  <Text style={styles.primaryBtnText}>Import Products (.csv)</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={[styles.exportTopBtn, { flex: 1 }]} onPress={handleExportProducts}>
-                  <Text style={styles.exportTopText}>📤 Export Products (.csv)</Text>
+                  <Text style={styles.exportTopText}>Export Products (.csv)</Text>
                 </TouchableOpacity>
               </View>
             </View>
 
             <View style={styles.card}>
-              <Text style={styles.cardTitle}>📋 Inventory & Stock Levels</Text>
+              <Text style={styles.cardTitle}>Inventory Balances</Text>
               <Text style={styles.cardSub}>Update stock counts with Delivery Report Numbers (DR#) or export current balances.</Text>
               <View style={{ flexDirection: "row", gap: 10, marginTop: 8 }}>
                 <TouchableOpacity style={[styles.primaryBtn, { flex: 1, backgroundColor: C.blue }]} onPress={() => Alert.alert("Import Ready", "Select Excel inventory file with Barcode, Quantity, and DR Number.")}>
-                  <Text style={styles.primaryBtnText}>📥 Import Inventory (.csv)</Text>
+                  <Text style={styles.primaryBtnText}>Import Inventory (.csv)</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={[styles.exportTopBtn, { flex: 1 }]} onPress={handleExportInventory}>
-                  <Text style={styles.exportTopText}>📤 Export Inventory (.csv)</Text>
+                  <Text style={styles.exportTopText}>Export Inventory (.csv)</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -861,42 +860,43 @@ export const MoreMenuScreen: React.FC<MoreMenuScreenProps> = ({ onClose, onSwitc
       {/* ── LEFT SIDEBAR ────────────────────────────────────────── */}
       <View style={styles.sidebar}>
         <ScrollView showsVerticalScrollIndicator={false}>
-          {renderSidebarItem("Order", "ORDER", "🛒")}
-          {renderSidebarItem("Switch Cashier (X-Read)", "SWITCH_CASHIER", "🔄")}
-          {renderSidebarItem("Calculator", "CALCULATOR", "🖩")}
+          <Text style={styles.sectionHeader}>REGISTER</Text>
+          {renderSidebarItem("Sales Register", "ORDER")}
+          {renderSidebarItem("Shift Handover", "SWITCH_CASHIER")}
+          {renderSidebarItem("Calculator", "CALCULATOR")}
 
           <View style={styles.divider} />
-          <Text style={styles.sectionHeader}>RECORDS</Text>
-          {renderSidebarItem("Terminal Record", "TERMINAL_RECORD", "📋")}
-          {renderSidebarItem("Transaction History", "TRANSACTION_HISTORY", "🧾")}
-          {renderSidebarItem("Delivery Report", "DELIVERY_REPORT", "🚚")}
-          {renderSidebarItem("Staff Record", "STAFF_RECORD", "👤")}
-          {renderSidebarItem("X-Read History", "X_READ_HISTORY", "📊")}
-          {renderSidebarItem("Z-Read History", "Z_READ_HISTORY", "🛑")}
-          {renderSidebarItem("Discount Report", "DISCOUNT_REPORT", "%")}
-          {renderSidebarItem("Void Report", "VOID_REPORT", "✗")}
-          {renderSidebarItem("Audit Logs", "AUDIT_LOGS", "🛡")}
+          <Text style={styles.sectionHeader}>REPORTS</Text>
+          {renderSidebarItem("Sales History", "TRANSACTION_HISTORY")}
+          {renderSidebarItem("Terminal Summary", "TERMINAL_RECORD")}
+          {renderSidebarItem("Deliveries (DR)", "DELIVERY_REPORT")}
+          {renderSidebarItem("Cashier Performance", "STAFF_RECORD")}
+          {renderSidebarItem("X-Readings", "X_READ_HISTORY")}
+          {renderSidebarItem("Z-Readings", "Z_READ_HISTORY")}
+          {renderSidebarItem("Discounts Log", "DISCOUNT_REPORT")}
+          {renderSidebarItem("Voided Items", "VOID_REPORT")}
+          {renderSidebarItem("Activity Audit", "AUDIT_LOGS")}
 
           <View style={styles.divider} />
-          <Text style={styles.sectionHeader}>CUSTOMER / MEMBERSHIP</Text>
-          {renderSidebarItem("Add / Enroll Member", "ADD_ENROLL_MEMBER", "👥")}
-          {renderSidebarItem("Add Points", "ADD_POINTS", "➕")}
-          {renderSidebarItem("Add Category/Division", "ADD_CATEGORY_DIVISION", "🏷")}
-          {renderSidebarItem("Manage Discounts", "MANAGE_DISCOUNTS", "🎁")}
-          {renderSidebarItem("Member Top-Up History", "MEMBER_TOPUP_HISTORY", "📜")}
+          <Text style={styles.sectionHeader}>CUSTOMERS & LOYALTY</Text>
+          {renderSidebarItem("Register Member", "ADD_ENROLL_MEMBER")}
+          {renderSidebarItem("Reload Points", "ADD_POINTS")}
+          {renderSidebarItem("Member Divisions", "ADD_CATEGORY_DIVISION")}
+          {renderSidebarItem("Group Discounts", "MANAGE_DISCOUNTS")}
+          {renderSidebarItem("Points Ledger", "MEMBER_TOPUP_HISTORY")}
 
           <View style={styles.divider} />
           <Text style={styles.sectionHeader}>OPERATIONS</Text>
-          {renderSidebarItem("Pay In / Pay Out", "PAY_IN_OUT", "💵")}
-          {renderSidebarItem("Close Store (Z-Read)", "CLOSE_STORE", "🛑")}
-          {renderSidebarItem("Manage Payment Methods", "MANAGE_PAYMENT_METHODS", "💳")}
-          {renderSidebarItem("Database Management", "DATABASE_MANAGEMENT", "📁")}
+          {renderSidebarItem("Cash Drawer", "PAY_IN_OUT")}
+          {renderSidebarItem("Store Closing (Z-Read)", "CLOSE_STORE")}
+          {renderSidebarItem("Payment Methods", "MANAGE_PAYMENT_METHODS")}
+          {renderSidebarItem("Import / Export Data", "DATABASE_MANAGEMENT")}
 
           <View style={styles.divider} />
           <Text style={styles.sectionHeader}>SETTINGS</Text>
-          {renderSidebarItem("Store Settings", "STORE_SETTINGS", "🏪")}
-          {renderSidebarItem("Staff & Dynamic Roles", "STAFF_SETTINGS", "👥")}
-          {renderSidebarItem("Database Backup", "DATABASE_BACKUP", "🗄")}
+          {renderSidebarItem("Store & Devices", "STORE_SETTINGS")}
+          {renderSidebarItem("Staff & Permissions", "STAFF_SETTINGS")}
+          {renderSidebarItem("Database Backup", "DATABASE_BACKUP")}
 
           <View style={{ height: 24 }} />
         </ScrollView>
@@ -966,7 +966,7 @@ export const MoreMenuScreen: React.FC<MoreMenuScreenProps> = ({ onClose, onSwitc
                   }
                 }}
               >
-                <Text style={styles.primaryBtnText}>🖨 Reprint Receipt</Text>
+                <Text style={styles.primaryBtnText}>Reprint Receipt</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.exportTopBtn, { flex: 1 }]} onPress={() => setSelectedSale(null)}>
                 <Text style={styles.exportTopText}>Close</Text>

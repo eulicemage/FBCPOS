@@ -11,3 +11,4 @@ if (fs.existsSync(indexPath)) {
 } else {
   console.warn('[fix-dist] index.html not found at', indexPath);
 }
+

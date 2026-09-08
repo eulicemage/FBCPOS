@@ -1,4 +1,4 @@
-﻿import React, { useState } from "react";
+import React, { useState } from "react";
 import {
   StyleSheet, View, Text, TextInput, TouchableOpacity,
   SafeAreaView, Alert, Modal, ScrollView, Switch,
@@ -171,15 +171,15 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onProg
 
       {/* Programmer bypass button */}
       <TouchableOpacity style={styles.progBtn} onPress={() => setShowProgrammer(true)}>
-        <Text style={styles.progBtnText}>🛠 Programmer</Text>
+        <Text style={styles.progBtnText}>Engineer Setup</Text>
       </TouchableOpacity>
 
       {/* ─── CASH DECLARATION MODAL ─────────────────────────── */}
       <Modal visible={showCashDecl} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.cashModal}>
-            <Text style={styles.cashModalTitle}>💰 Opening Cash Declaration</Text>
-            <Text style={styles.cashModalSub}>Welcome, {pendingUser?.fullName}. Enter the cash float in the drawer before starting your shift.</Text>
+            <Text style={styles.cashModalTitle}>Starting Cash Float</Text>
+            <Text style={styles.cashModalSub}>Welcome, {pendingUser?.fullName}. Enter the starting cash amount in the drawer before opening register.</Text>
             <TextInput
               style={styles.cashInput}
               value={cashInput}
@@ -189,9 +189,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onProg
               placeholderTextColor={C.gray400}
               autoFocus
             />
-            <Text style={styles.cashHint}>₱ Amount in Drawer</Text>
+            <Text style={styles.cashHint}>₱ Starting Amount</Text>
             <TouchableOpacity style={styles.cashConfirmBtn} onPress={handleCashDeclConfirm}>
-              <Text style={styles.cashConfirmText}>CONFIRM & OPEN REGISTER</Text>
+              <Text style={styles.cashConfirmText}>Open Register</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -202,7 +202,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onProg
         <View style={styles.modalOverlay}>
           <View style={styles.progModal}>
             <View style={styles.progModalHeader}>
-              <Text style={styles.progModalTitle}>🛠 Programmer Settings</Text>
+              <Text style={styles.progModalTitle}>Engineer Diagnostics & Setup</Text>
               <TouchableOpacity onPress={() => { setShowProgrammer(false); setProgrammerPin(""); setProgrammerError(""); }}>
                 <Text style={styles.closeBtn}>✕</Text>
               </TouchableOpacity>
