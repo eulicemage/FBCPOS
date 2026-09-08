@@ -86,6 +86,8 @@ export const ShiftHistoryModal: React.FC<ShiftHistoryModalProps> = ({
     Alert.alert('Printed', `Z-Reading #${item.zCounter} reprinted on ${paperWidth} thermal paper.`);
   };
 
+  if (!visible) return null;
+
   return (
     <Modal visible={visible} animationType="slide" transparent statusBarTranslucent>
       <View style={styles.overlay}>

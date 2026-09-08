@@ -80,6 +80,8 @@ export const QuickAddProductModal: React.FC<QuickAddProductModalProps> = ({
     onClose();
   };
 
+  if (!visible) return null;
+
   return (
     <Modal visible={visible} animationType="slide" transparent statusBarTranslucent>
       <View style={styles.overlay}>

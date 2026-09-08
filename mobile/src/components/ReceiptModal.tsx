@@ -25,7 +25,7 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
   onNewSale,
   onPrint,
 }) => {
-  if (!sale) return null;
+  if (!visible || !sale) return null;
 
   const formatDate = (iso: string) => {
     const d = new Date(iso);

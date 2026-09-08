@@ -908,132 +908,142 @@ export const MoreMenuScreen: React.FC<MoreMenuScreenProps> = ({ onClose, onSwitc
       <View style={styles.rightArea}>{renderContent()}</View>
 
       {/* ── RECEIPT DETAIL MODAL ────────────────────────────────── */}
-      <Modal visible={selectedSale !== null} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.receiptCard}>
-            <Text style={styles.receiptTitle}>FOOD BASKETS CORPORATION</Text>
-            <Text style={styles.receiptSub}>Invoice: {selectedSale?.invoiceNumber}</Text>
-            <Text style={styles.receiptSub}>Cashier: {selectedSale?.cashierName} · {selectedSale && new Date(selectedSale.createdAt).toLocaleString()}</Text>
-            <View style={styles.divider} />
-            <ScrollView style={{ maxHeight: 200 }}>
-              {selectedSale?.items.map((i, idx) => (
-                <View key={idx} style={{ flexDirection: "row", justifyContent: "space-between", marginVertical: 3 }}>
-                  <Text style={{ fontSize: 13, flex: 2 }}>{i.quantity}x {i.productName}</Text>
-                  <Text style={{ fontSize: 13, fontWeight: "700" }}>₱{(i.totalAmount || (i.unitPrice * i.quantity)).toFixed(2)}</Text>
-                </View>
-              ))}
-            </ScrollView>
-            <View style={styles.divider} />
-            <View style={{ flexDirection: "row", justifyContent: "space-between", marginVertical: 2 }}>
-              <Text style={{ fontSize: 14, fontWeight: "900" }}>TOTAL:</Text>
-              <Text style={{ fontSize: 16, fontWeight: "900", color: C.green }}>₱{selectedSale?.totalAmount.toFixed(2)}</Text>
-            </View>
-            <View style={{ flexDirection: "row", justifyContent: "space-between", marginVertical: 2 }}>
-              <Text style={{ fontSize: 12, color: C.gray600 }}>Tendered ({selectedSale?.payments?.[0]?.method || "CASH"}):</Text>
-              <Text style={{ fontSize: 12 }}>₱{(selectedSale?.totalTendered || selectedSale?.totalAmount || 0).toFixed(2)}</Text>
-            </View>
-            <View style={{ flexDirection: "row", justifyContent: "space-between", marginVertical: 2 }}>
-              <Text style={{ fontSize: 12, color: C.gray600 }}>Change:</Text>
-              <Text style={{ fontSize: 12 }}>₱{(selectedSale?.totalChange || 0).toFixed(2)}</Text>
-            </View>
-            <View style={{ flexDirection: "row", gap: 10, marginTop: 16 }}>
-              <TouchableOpacity
-                style={[styles.primaryBtn, { flex: 1, backgroundColor: C.navy }]}
-                onPress={() => {
-                  if (selectedSale) {
-                    printReceipt({
-                      branchName: "FoodBaskets Corp",
-                      branchAddress: "123 Rizal Ave, Manila",
-                      taxId: "100-001-000-000",
-                      invoiceNumber: selectedSale.invoiceNumber,
-                      cashierName: selectedSale.cashierName,
-                      terminalNumber: selectedSale.terminalNumber || "T1",
-                      items: selectedSale.items.map((it) => ({
-                        name: it.productName,
-                        quantity: it.quantity,
-                        unitPrice: it.unitPrice,
-                        totalAmount: it.totalAmount || (it.unitPrice * it.quantity),
-                      })),
-                      subtotal: selectedSale.subtotalAmount || selectedSale.totalAmount,
-                      discountAmount: selectedSale.discountAmount || 0,
-                      vatableAmount: selectedSale.vatableAmount || (selectedSale.totalAmount / 1.12),
-                      vatAmount: selectedSale.taxAmount || 0,
-                      totalDue: selectedSale.totalAmount,
-                      amountReceived: selectedSale.totalTendered || selectedSale.totalAmount,
-                      changeAmount: selectedSale.totalChange || 0,
-                      paymentMethod: selectedSale.payments?.[0]?.method || "CASH",
-                      date: selectedSale.createdAt,
-                    });
-                    Alert.alert("Reprint", "Receipt sent to printer.");
-                  }
-                }}
-              >
-                <Text style={styles.primaryBtnText}>Reprint Receipt</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.exportTopBtn, { flex: 1 }]} onPress={() => setSelectedSale(null)}>
-                <Text style={styles.exportTopText}>Close</Text>
-              </TouchableOpacity>
+      {selectedSale !== null && (
+        <Modal visible={selectedSale !== null} transparent animationType="fade">
+          <View style={styles.modalOverlay}>
+            <View style={styles.receiptCard}>
+              <Text style={styles.receiptTitle}>FOOD BASKETS CORPORATION</Text>
+              <Text style={styles.receiptSub}>Invoice: {selectedSale?.invoiceNumber}</Text>
+              <Text style={styles.receiptSub}>Cashier: {selectedSale?.cashierName} · {selectedSale && new Date(selectedSale.createdAt).toLocaleString()}</Text>
+              <View style={styles.divider} />
+              <ScrollView style={{ maxHeight: 200 }}>
+                {selectedSale?.items.map((i, idx) => (
+                  <View key={idx} style={{ flexDirection: "row", justifyContent: "space-between", marginVertical: 3 }}>
+                    <Text style={{ fontSize: 13, flex: 2 }}>{i.quantity}x {i.productName}</Text>
+                    <Text style={{ fontSize: 13, fontWeight: "700" }}>₱{(i.totalAmount || (i.unitPrice * i.quantity)).toFixed(2)}</Text>
+                  </View>
+                ))}
+              </ScrollView>
+              <View style={styles.divider} />
+              <View style={{ flexDirection: "row", justifyContent: "space-between", marginVertical: 2 }}>
+                <Text style={{ fontSize: 14, fontWeight: "900" }}>TOTAL:</Text>
+                <Text style={{ fontSize: 16, fontWeight: "900", color: C.green }}>₱{selectedSale?.totalAmount.toFixed(2)}</Text>
+              </View>
+              <View style={{ flexDirection: "row", justifyContent: "space-between", marginVertical: 2 }}>
+                <Text style={{ fontSize: 12, color: C.gray600 }}>Tendered ({selectedSale?.payments?.[0]?.method || "CASH"}):</Text>
+                <Text style={{ fontSize: 12 }}>₱{(selectedSale?.totalTendered || selectedSale?.totalAmount || 0).toFixed(2)}</Text>
+              </View>
+              <View style={{ flexDirection: "row", justifyContent: "space-between", marginVertical: 2 }}>
+                <Text style={{ fontSize: 12, color: C.gray600 }}>Change:</Text>
+                <Text style={{ fontSize: 12 }}>₱{(selectedSale?.totalChange || 0).toFixed(2)}</Text>
+              </View>
+              <View style={{ flexDirection: "row", gap: 10, marginTop: 16 }}>
+                <TouchableOpacity
+                  style={[styles.primaryBtn, { flex: 1, backgroundColor: C.navy }]}
+                  onPress={() => {
+                    if (selectedSale) {
+                      printReceipt({
+                        branchName: "FoodBaskets Corp",
+                        branchAddress: "123 Rizal Ave, Manila",
+                        taxId: "100-001-000-000",
+                        invoiceNumber: selectedSale.invoiceNumber,
+                        cashierName: selectedSale.cashierName,
+                        terminalNumber: selectedSale.terminalNumber || "T1",
+                        items: selectedSale.items.map((it) => ({
+                          name: it.productName,
+                          quantity: it.quantity,
+                          unitPrice: it.unitPrice,
+                          totalAmount: it.totalAmount || (it.unitPrice * it.quantity),
+                        })),
+                        subtotal: selectedSale.subtotalAmount || selectedSale.totalAmount,
+                        discountAmount: selectedSale.discountAmount || 0,
+                        vatableAmount: selectedSale.vatableAmount || (selectedSale.totalAmount / 1.12),
+                        vatAmount: selectedSale.taxAmount || 0,
+                        totalDue: selectedSale.totalAmount,
+                        amountReceived: selectedSale.totalTendered || selectedSale.totalAmount,
+                        changeAmount: selectedSale.totalChange || 0,
+                        paymentMethod: selectedSale.payments?.[0]?.method || "CASH",
+                        date: selectedSale.createdAt,
+                      });
+                      Alert.alert("Reprint", "Receipt sent to printer.");
+                    }
+                  }}
+                >
+                  <Text style={styles.primaryBtnText}>Reprint Receipt</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.exportTopBtn, { flex: 1 }]} onPress={() => setSelectedSale(null)}>
+                  <Text style={styles.exportTopText}>Close</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
-        </View>
-      </Modal>
+        </Modal>
+      )}
 
       {/* ── ADD DELIVERY REPORT MODAL ───────────────────────────── */}
-      <Modal visible={showAddDr} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.receiptCard}>
-            <Text style={styles.receiptTitle}>Add Delivery Report</Text>
-            <TextInput style={styles.input} placeholder="DR Number (e.g. DR-2026-0906)" value={newDrNumber} onChangeText={setNewDrNumber} />
-            <TextInput style={styles.input} placeholder="Supplier / Vendor" value={newDrSupplier} onChangeText={setNewDrSupplier} />
-            <TextInput style={styles.input} placeholder="Total Delivery Value (₱)" value={newDrAmount} onChangeText={setNewDrAmount} keyboardType="numeric" />
-            <View style={{ flexDirection: "row", gap: 10, marginTop: 12 }}>
-              <TouchableOpacity style={[styles.exportTopBtn, { flex: 1 }]} onPress={() => setShowAddDr(false)}>
-                <Text style={styles.exportTopText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.primaryBtn, { flex: 1 }]}
-                onPress={() => {
-                  if (!newDrNumber.trim()) { Alert.alert("Validation", "Enter DR Number."); return; }
-                  setDeliveryRecords((prev) => [
-                    { id: `dr-${Date.now()}`, drNumber: newDrNumber.trim(), supplier: newDrSupplier.trim() || "Supplier", date: new Date().toISOString().slice(0, 10), itemsCount: 1, amount: parseFloat(newDrAmount) || 0 },
-                    ...prev,
-                  ]);
-                  setShowAddDr(false);
-                  setNewDrNumber(""); setNewDrSupplier(""); setNewDrAmount("");
-                  Alert.alert("Success", "Delivery Report recorded.");
-                }}
-              >
-                <Text style={styles.primaryBtnText}>Save</Text>
-              </TouchableOpacity>
+      {showAddDr && (
+        <Modal visible={showAddDr} transparent animationType="fade">
+          <View style={styles.modalOverlay}>
+            <View style={styles.receiptCard}>
+              <Text style={styles.receiptTitle}>Add Delivery Report</Text>
+              <TextInput style={styles.input} placeholder="DR Number (e.g. DR-2026-0906)" value={newDrNumber} onChangeText={setNewDrNumber} />
+              <TextInput style={styles.input} placeholder="Supplier / Vendor" value={newDrSupplier} onChangeText={setNewDrSupplier} />
+              <TextInput style={styles.input} placeholder="Total Delivery Value (₱)" value={newDrAmount} onChangeText={setNewDrAmount} keyboardType="numeric" />
+              <View style={{ flexDirection: "row", gap: 10, marginTop: 12 }}>
+                <TouchableOpacity style={[styles.exportTopBtn, { flex: 1 }]} onPress={() => setShowAddDr(false)}>
+                  <Text style={styles.exportTopText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.primaryBtn, { flex: 1 }]}
+                  onPress={() => {
+                    if (!newDrNumber.trim()) { Alert.alert("Validation", "Enter DR Number."); return; }
+                    setDeliveryRecords((prev) => [
+                      { id: `dr-${Date.now()}`, drNumber: newDrNumber.trim(), supplier: newDrSupplier.trim() || "Supplier", date: new Date().toISOString().slice(0, 10), itemsCount: 1, amount: parseFloat(newDrAmount) || 0 },
+                      ...prev,
+                    ]);
+                    setShowAddDr(false);
+                    setNewDrNumber(""); setNewDrSupplier(""); setNewDrAmount("");
+                    Alert.alert("Success", "Delivery Report recorded.");
+                  }}
+                >
+                  <Text style={styles.primaryBtnText}>Save</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
-        </View>
-      </Modal>
+        </Modal>
+      )}
 
       {/* ── SHIFT CLOSURE MODALS ────────────────────────────────── */}
-      <ShiftReadingModal
-        visible={zReadModalVisible}
-        type="Z_READ"
-        onClose={() => setZReadModalVisible(false)}
-        onStoreClosed={() => {
-          setZReadModalVisible(false);
-          Alert.alert("Store Closed", "Daily Z-Reading completed.");
-          if (onSwitchCashier) onSwitchCashier();
-        }}
-      />
-      <ShiftReadingModal
-        visible={xReadModalVisible}
-        type="X_READ"
-        onClose={() => setXReadModalVisible(false)}
-        onShiftClosed={() => {
-          setXReadModalVisible(false);
-          if (onSwitchCashier) onSwitchCashier();
-        }}
-      />
-      <CalculatorModal
-        visible={calculatorVisible}
-        onClose={() => setCalculatorVisible(false)}
-      />
+      {zReadModalVisible && (
+        <ShiftReadingModal
+          visible={zReadModalVisible}
+          type="Z_READ"
+          onClose={() => setZReadModalVisible(false)}
+          onStoreClosed={() => {
+            setZReadModalVisible(false);
+            Alert.alert("Store Closed", "Daily Z-Reading completed.");
+            if (onSwitchCashier) onSwitchCashier();
+          }}
+        />
+      )}
+      {xReadModalVisible && (
+        <ShiftReadingModal
+          visible={xReadModalVisible}
+          type="X_READ"
+          onClose={() => setXReadModalVisible(false)}
+          onShiftClosed={() => {
+            setXReadModalVisible(false);
+            if (onSwitchCashier) onSwitchCashier();
+          }}
+        />
+      )}
+      {calculatorVisible && (
+        <CalculatorModal
+          visible={calculatorVisible}
+          onClose={() => setCalculatorVisible(false)}
+        />
+      )}
     </View>
   );
 };

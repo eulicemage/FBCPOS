@@ -219,6 +219,8 @@ export const ReturnModal: React.FC<ReturnModalProps> = ({ visible, onClose }) =>
     }
   };
 
+  if (!visible) return null;
+
   return (
     <Modal visible={visible} animationType="slide" transparent statusBarTranslucent>
       <View style={styles.overlay}>

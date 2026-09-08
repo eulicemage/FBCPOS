@@ -67,6 +67,8 @@ export const BackupModal: React.FC<BackupModalProps> = ({ visible, onClose }) =>
     );
   };
 
+  if (!visible) return null;
+
   return (
     <Modal visible={visible} animationType="slide" transparent statusBarTranslucent>
       <View style={styles.overlay}>

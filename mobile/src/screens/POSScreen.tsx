@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from "react";
+import React, { useState, useRef, useCallback, useEffect } from "react";
 import {
   StyleSheet, View, Text, TextInput, TouchableOpacity,
   FlatList, ScrollView, Alert, Image, Platform, StatusBar,
@@ -210,8 +210,100 @@ export const POSScreen: React.FC<POSScreenProps> = ({
   function handleSwitchCashier() {
     setReadingType("X_READ");
     setReadingModalVisible(true);
-    if (onSwitchCashier) onSwitchCashier();
   }
+
+  // ─── PC Physical Keyboard Shortcuts ───────────────────────────
+  useEffect(() => {
+    if (Platform.OS !== "web" || typeof window === "undefined") return;
+
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName?.toLowerCase();
+      const isInput = tag === "input" || tag === "textarea";
+
+      const anyModalOpen =
+        discountModalVisible || heldCartsModalVisible || priceCheckModalVisible ||
+        quantityModalVisible || calculatorModalVisible || supervisorModalVisible ||
+        quickAddModalVisible || memberModalVisible || readingModalVisible ||
+        historyModalVisible || hardwareModalVisible || returnModalVisible ||
+        backupModalVisible || syncModalVisible || auditModalVisible;
+
+      if (e.key === "F11") {
+        e.preventDefault();
+        handleBypassToggle();
+        return;
+      }
+
+      if (anyModalOpen) return;
+
+      if (e.ctrlKey || e.metaKey) {
+        const key = e.key.toLowerCase();
+        if (key === "p") {
+          e.preventDefault();
+          if (items.length > 0) {
+            onNavigateToCheckout?.();
+          } else {
+            Alert.alert("Empty Cart", "Please add items to cart before proceeding to payment.");
+          }
+        } else if (key === "q") {
+          e.preventDefault();
+          if (items.length > 0) {
+            if (!selectedItemId) setSelectedItemId(items[items.length - 1].productId);
+            setQuantityModalVisible(true);
+          } else {
+            Alert.alert("Empty Cart", "No items to change quantity.");
+          }
+        } else if (key === "v") {
+          e.preventDefault();
+          if (items.length > 0) {
+            const targetId = selectedItemId || items[items.length - 1].productId;
+            handleItemVoid(targetId);
+          } else {
+            Alert.alert("Empty Cart", "No items in cart to void.");
+          }
+        } else if (key === "1") {
+          e.preventDefault();
+          setDiscountItemMode(true);
+          setDiscountModalVisible(true);
+        } else if (key === "2") {
+          e.preventDefault();
+          setDiscountItemMode(false);
+          setDiscountModalVisible(true);
+        } else if (key === "c") {
+          e.preventDefault();
+          setMemberModalVisible(true);
+        }
+        return;
+      }
+
+      if (isInput) return;
+
+      if (e.key === "F3") {
+        e.preventDefault();
+        setReturnModalVisible(true);
+      } else if (e.key === "F4") {
+        e.preventDefault();
+        if (items.length > 0) {
+          clearCart();
+          setSelectedItemId(null);
+          Alert.alert("Cancelled", "Transaction cancelled.");
+        }
+      } else if (e.key === "F6") {
+        e.preventDefault();
+        setHeldCartsModalVisible(true);
+      }
+    };
+
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+  }, [
+    items, selectedItemId, discountModalVisible, heldCartsModalVisible,
+    priceCheckModalVisible, quantityModalVisible, calculatorModalVisible,
+    supervisorModalVisible, quickAddModalVisible, memberModalVisible,
+    readingModalVisible, historyModalVisible, hardwareModalVisible,
+    returnModalVisible, backupModalVisible, syncModalVisible, auditModalVisible,
+    sessionBypassActive, isBypassMode, onNavigateToCheckout
+  ]);
 
   const orderNo = currentShift?.shiftNumber ?? "0001";
   const subtotal = getSubtotal();
@@ -276,6 +368,15 @@ export const POSScreen: React.FC<POSScreenProps> = ({
           />
           <TouchableOpacity style={styles.lookupBtn} onPress={handleBarcodeSubmit}>
             <Text style={styles.lookupBtnText}>Search</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.catalogBtn}
+            onPress={() => {
+              setPriceCheckQuery("");
+              setPriceCheckModalVisible(true);
+            }}
+          >
+            <Text style={styles.catalogBtnText}>Catalog</Text>
           </TouchableOpacity>
         </View>
 
@@ -350,7 +451,35 @@ export const POSScreen: React.FC<POSScreenProps> = ({
           {items.length === 0 ? (
             <View style={styles.emptyCart}>
               <Text style={styles.emptyCartTitle}>Register Ready</Text>
-              <Text style={styles.emptyCartText}>Scan a barcode or enter an item above</Text>
+              <Text style={styles.emptyCartText}>Scan a barcode above, or click any product to add to cart:</Text>
+              <View style={styles.quickGrid}>
+                {products.slice(0, 8).map((prod) => (
+                  <TouchableOpacity
+                    key={prod.id}
+                    style={styles.quickCard}
+                    onPress={() => addItem(prod)}
+                  >
+                    <Text style={styles.quickCardName} numberOfLines={2}>
+                      {prod.name}
+                    </Text>
+                    <View style={styles.quickCardBottom}>
+                      <Text style={styles.quickCardPrice}>₱{prod.sellingPrice.toFixed(2)}</Text>
+                      <Text style={styles.quickCardAdd}>+ Add</Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <TouchableOpacity
+                style={styles.browseCatalogBtn}
+                onPress={() => {
+                  setPriceCheckQuery("");
+                  setPriceCheckModalVisible(true);
+                }}
+              >
+                <Text style={styles.browseCatalogBtnText}>
+                  Browse All Products ({products.length} Items)
+                </Text>
+              </TouchableOpacity>
             </View>
           ) : (
             <FlatList
@@ -410,7 +539,13 @@ export const POSScreen: React.FC<POSScreenProps> = ({
                 onPress={() => setMemberModalVisible(true)} />
               <ActionBtn label="Quantity" sublabel="Ctrl+Q" color={C.blue} disabled={!can("QUANTITY_CHANGE")}
                 onPress={() => {
-                  if (!selectedItemId) { Alert.alert("Select Item", "Select an item from the cart first."); return; }
+                  if (items.length === 0) {
+                    Alert.alert("Empty Cart", "Add items to cart before changing quantity.");
+                    return;
+                  }
+                  if (!selectedItemId) {
+                    setSelectedItemId(items[items.length - 1].productId);
+                  }
                   setQuantityModalVisible(true);
                 }} />
             </View>
@@ -418,8 +553,12 @@ export const POSScreen: React.FC<POSScreenProps> = ({
             <TouchableOpacity
               style={[styles.voidBtn, !can("VOID_ITEM") && styles.disabledBtn]}
               onPress={() => {
-                if (!selectedItemId) { Alert.alert("Select Item", "Select an item to void."); return; }
-                handleItemVoid(selectedItemId);
+                if (items.length === 0) {
+                  Alert.alert("Empty Cart", "No items in cart to void.");
+                  return;
+                }
+                const targetId = selectedItemId || items[items.length - 1].productId;
+                handleItemVoid(targetId);
               }}
             >
               <Text style={styles.voidBtnText}>Void Selected Item (Ctrl+V)</Text>
@@ -457,14 +596,27 @@ export const POSScreen: React.FC<POSScreenProps> = ({
               <MiniBtn label="Hold" color={C.blue} disabled={!can("HOLD_CART")} onPress={handleHold} />
               <MiniBtn label="Recall" color={C.blue} disabled={!can("RETRIEVE_CART")} onPress={() => setHeldCartsModalVisible(true)} />
               <MiniBtn label="Refund" color={C.orange} disabled={!can("REFUND")} onPress={() => setReturnModalVisible(true)} />
-              <MiniBtn label="Cancel" color={C.red} disabled={!can("CANCEL_TRANSACTION")} onPress={() => { if (items.length > 0) { clearCart(); Alert.alert("Cancelled", "Transaction cancelled."); } }} />
+              <MiniBtn label="Cancel" color={C.red} disabled={!can("CANCEL_TRANSACTION")} onPress={() => {
+                if (items.length === 0) {
+                  Alert.alert("Empty Cart", "No active transaction to cancel.");
+                  return;
+                }
+                clearCart();
+                setSelectedItemId(null);
+                Alert.alert("Cancelled", "Transaction cancelled.");
+              }} />
             </View>
 
             {/* Primary Action Button */}
             <TouchableOpacity
-              style={[styles.payBtn, items.length === 0 && styles.disabledBtn]}
-              disabled={items.length === 0}
-              onPress={() => { if (items.length > 0 && onNavigateToCheckout) onNavigateToCheckout(); }}
+              style={[styles.payBtn, items.length === 0 && styles.payBtnEmpty]}
+              onPress={() => {
+                if (items.length === 0) {
+                  Alert.alert("Empty Cart", "Please add items to the cart before proceeding to payment.");
+                  return;
+                }
+                if (onNavigateToCheckout) onNavigateToCheckout();
+              }}
             >
               <Text style={styles.payBtnText}>Pay  ₱{total.toFixed(2)}</Text>
               <Text style={styles.payBtnSub}>Ctrl+P</Text>
@@ -473,7 +625,13 @@ export const POSScreen: React.FC<POSScreenProps> = ({
             {/* Delivery Order Button */}
             <TouchableOpacity
               style={styles.deliverBtn}
-              onPress={() => Alert.alert("Delivery", "Record Delivery Report (DR) flow.")}
+              onPress={() => {
+                if (onOpenMore) {
+                  onOpenMore();
+                } else {
+                  Alert.alert("Delivery Report", "Opening Delivery Records in More Hub.");
+                }
+              }}
             >
               <Text style={styles.deliverBtnText}>Delivery Receipt (DR)</Text>
             </TouchableOpacity>
@@ -483,21 +641,127 @@ export const POSScreen: React.FC<POSScreenProps> = ({
       </View>
 
       {/* ─── MODALS ───────────────────────────────────────────── */}
-      <DiscountModal visible={discountModalVisible} onClose={() => setDiscountModalVisible(false)} onApplyDiscount={(type: DiscountType, value: number) => { applyDiscount(type, value); setDiscountModalVisible(false); }} />
-      <HeldCartsModal visible={heldCartsModalVisible} onClose={() => setHeldCartsModalVisible(false)} onRecallCart={(cart: HeldCart) => { loadCart(cart.items, cart.discountType, cart.discountValue, cart.customerName, cart.customerTinId); setHeldCartsModalVisible(false); }} />
-      <PriceCheckModal visible={priceCheckModalVisible} initialQuery={priceCheckQuery} onClose={() => setPriceCheckModalVisible(false)} products={products} onAddToCart={(p: Product) => { addItem(p); setPriceCheckModalVisible(false); }} />
-      <QuantityModal visible={quantityModalVisible} initialQuantity={items.find((i) => i.productId === selectedItemId)?.quantity || 1} itemName={items.find((i) => i.productId === selectedItemId)?.name} onClose={() => setQuantityModalVisible(false)} onConfirm={(qty) => { if (selectedItemId) updateQuantity(selectedItemId, qty); }} />
-      <CalculatorModal visible={calculatorModalVisible} onClose={() => setCalculatorModalVisible(false)} />
-      <SupervisorPinModal visible={supervisorModalVisible} actionTitle="Authorize Action" onAuthorize={() => handleSupervisorAuthorized()} onCancel={() => setSupervisorModalVisible(false)} />
-      <QuickAddProductModal visible={quickAddModalVisible} initialBarcode={pendingAddBarcode} onClose={() => setQuickAddModalVisible(false)} onProductAdded={(p: Product) => { addItem(p); setQuickAddModalVisible(false); }} />
-      <MemberManagementModal visible={memberModalVisible} onClose={() => setMemberModalVisible(false)} />
-      <ShiftReadingModal visible={readingModalVisible} type={readingType} onClose={() => setReadingModalVisible(false)} onShiftClosed={() => { setReadingModalVisible(false); if (readingType === "X_READ" && onSwitchCashier) onSwitchCashier(); }} />
-      <ShiftHistoryModal visible={historyModalVisible} onClose={() => setHistoryModalVisible(false)} />
-      <HardwareSettingsModal visible={hardwareModalVisible} onClose={() => setHardwareModalVisible(false)} />
-      <ReturnModal visible={returnModalVisible} onClose={() => setReturnModalVisible(false)} />
-      <BackupModal visible={backupModalVisible} onClose={() => setBackupModalVisible(false)} />
-      <SyncStatusModal visible={syncModalVisible} onClose={() => setSyncModalVisible(false)} />
-      <SecurityAuditModal visible={auditModalVisible} onClose={() => setAuditModalVisible(false)} />
+      {discountModalVisible && (
+        <DiscountModal
+          visible={discountModalVisible}
+          onClose={() => setDiscountModalVisible(false)}
+          onApplyDiscount={(type: DiscountType, value: number) => {
+            applyDiscount(type, value);
+            setDiscountModalVisible(false);
+          }}
+        />
+      )}
+      {heldCartsModalVisible && (
+        <HeldCartsModal
+          visible={heldCartsModalVisible}
+          onClose={() => setHeldCartsModalVisible(false)}
+          onRecallCart={(cart: HeldCart) => {
+            loadCart(cart.items, cart.discountType, cart.discountValue, cart.customerName, cart.customerTinId);
+            setHeldCartsModalVisible(false);
+          }}
+        />
+      )}
+      {priceCheckModalVisible && (
+        <PriceCheckModal
+          visible={priceCheckModalVisible}
+          initialQuery={priceCheckQuery}
+          onClose={() => setPriceCheckModalVisible(false)}
+          products={products}
+          onAddToCart={(p: Product) => {
+            addItem(p);
+            setPriceCheckModalVisible(false);
+          }}
+        />
+      )}
+      {quantityModalVisible && (
+        <QuantityModal
+          visible={quantityModalVisible}
+          initialQuantity={items.find((i) => i.productId === selectedItemId)?.quantity || 1}
+          itemName={items.find((i) => i.productId === selectedItemId)?.name}
+          onClose={() => setQuantityModalVisible(false)}
+          onConfirm={(qty) => {
+            if (selectedItemId) updateQuantity(selectedItemId, qty);
+          }}
+        />
+      )}
+      {calculatorModalVisible && (
+        <CalculatorModal
+          visible={calculatorModalVisible}
+          onClose={() => setCalculatorModalVisible(false)}
+        />
+      )}
+      {supervisorModalVisible && (
+        <SupervisorPinModal
+          visible={supervisorModalVisible}
+          actionTitle="Authorize Action"
+          onAuthorize={() => handleSupervisorAuthorized()}
+          onCancel={() => setSupervisorModalVisible(false)}
+        />
+      )}
+      {quickAddModalVisible && (
+        <QuickAddProductModal
+          visible={quickAddModalVisible}
+          initialBarcode={pendingAddBarcode}
+          onClose={() => setQuickAddModalVisible(false)}
+          onProductAdded={(p: Product) => {
+            addItem(p);
+            setQuickAddModalVisible(false);
+          }}
+        />
+      )}
+      {memberModalVisible && (
+        <MemberManagementModal
+          visible={memberModalVisible}
+          onClose={() => setMemberModalVisible(false)}
+        />
+      )}
+      {readingModalVisible && (
+        <ShiftReadingModal
+          visible={readingModalVisible}
+          type={readingType}
+          onClose={() => setReadingModalVisible(false)}
+          onShiftClosed={() => {
+            setReadingModalVisible(false);
+            if (onSwitchCashier) onSwitchCashier();
+          }}
+        />
+      )}
+      {historyModalVisible && (
+        <ShiftHistoryModal
+          visible={historyModalVisible}
+          onClose={() => setHistoryModalVisible(false)}
+        />
+      )}
+      {hardwareModalVisible && (
+        <HardwareSettingsModal
+          visible={hardwareModalVisible}
+          onClose={() => setHardwareModalVisible(false)}
+        />
+      )}
+      {returnModalVisible && (
+        <ReturnModal
+          visible={returnModalVisible}
+          onClose={() => setReturnModalVisible(false)}
+        />
+      )}
+      {backupModalVisible && (
+        <BackupModal
+          visible={backupModalVisible}
+          onClose={() => setBackupModalVisible(false)}
+        />
+      )}
+      {syncModalVisible && (
+        <SyncStatusModal
+          visible={syncModalVisible}
+          onClose={() => setSyncModalVisible(false)}
+        />
+      )}
+      {auditModalVisible && (
+        <SecurityAuditModal
+          visible={auditModalVisible}
+          onClose={() => setAuditModalVisible(false)}
+        />
+      )}
     </View>
   );
 };
@@ -620,9 +884,20 @@ const styles = StyleSheet.create({
   miniBtn: { borderWidth: 1.5, borderRadius: 6, paddingVertical: 7, paddingHorizontal: 4, alignItems: "center", flex: 1 },
   miniBtnText: { fontSize: 10, fontWeight: "700" },
   payBtn: { backgroundColor: C.green, borderRadius: 8, paddingVertical: 12, alignItems: "center", marginBottom: 6 },
+  payBtnEmpty: { backgroundColor: "#64748b" },
   payBtnText: { color: C.white, fontWeight: "800", fontSize: 16 },
   payBtnSub: { color: "rgba(255,255,255,0.7)", fontSize: 10, marginTop: 1 },
   deliverBtn: { backgroundColor: "#1e2d50", borderRadius: 8, paddingVertical: 9, alignItems: "center" },
   deliverBtnText: { color: C.white, fontWeight: "600", fontSize: 12 },
   disabledBtn: { opacity: 0.45 },
+  catalogBtn: { backgroundColor: C.navyDark, borderRadius: 6, paddingHorizontal: 14, paddingVertical: 8, marginLeft: 6 },
+  catalogBtnText: { color: C.white, fontWeight: "700", fontSize: 12 },
+  quickGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 14, marginBottom: 14, justifyContent: "center", maxWidth: 560, paddingHorizontal: 12 },
+  quickCard: { backgroundColor: C.white, borderWidth: 1, borderColor: C.gray200, borderRadius: 8, padding: 10, width: 125, minHeight: 74, justifyContent: "space-between" },
+  quickCardName: { fontSize: 11, fontWeight: "600", color: C.navyDark, lineHeight: 14 },
+  quickCardBottom: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 6 },
+  quickCardPrice: { fontSize: 12, fontWeight: "700", color: C.green },
+  quickCardAdd: { fontSize: 10, fontWeight: "700", color: C.orange },
+  browseCatalogBtn: { backgroundColor: C.navyDark, paddingVertical: 9, paddingHorizontal: 16, borderRadius: 6, marginTop: 4 },
+  browseCatalogBtnText: { color: C.white, fontSize: 12, fontWeight: "700" },
 });

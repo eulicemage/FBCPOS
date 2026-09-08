@@ -317,6 +317,8 @@ export const TenderModal: React.FC<TenderModalProps> = ({
     { key: 'MAYA', label: 'MAYA', color: '#059669' },
   ];
 
+  if (!visible) return null;
+
   return (
     <Modal visible={visible} animationType="slide" statusBarTranslucent>
       <View style={styles.container}>

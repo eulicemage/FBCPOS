@@ -1,7 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   StyleSheet, View, Text, TextInput, TouchableOpacity,
-  SafeAreaView, Alert, Modal, ScrollView, Switch,
+  SafeAreaView, Alert, Modal, ScrollView, Switch, Platform,
 } from "react-native";
 import { useAuthStore } from "../store/authStore";
 import { useDrawerStore } from "../store/drawerStore";
@@ -51,6 +51,25 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onProg
   const [featDrawer, setFeatDrawer] = useState(true);
   const [featPrint, setFeatPrint] = useState(true);
   const [featPricing, setFeatPricing] = useState(true);
+
+  // Support physical PC keyboard typing for PIN entry
+  useEffect(() => {
+    if (Platform.OS === "web" && typeof window !== "undefined") {
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (showCashDecl || showProgrammer) return;
+        if (e.key >= "0" && e.key <= "9") {
+          handlePinDigit(e.key);
+        } else if (e.key === "Backspace") {
+          setPin((p) => p.slice(0, -1));
+        } else if (e.key === "Escape" || e.key.toLowerCase() === "c") {
+          setPin("");
+          setErrorMsg("");
+        }
+      };
+      window.addEventListener("keydown", handleKeyDown);
+      return () => window.removeEventListener("keydown", handleKeyDown);
+    }
+  }, [showCashDecl, showProgrammer, pin]);
 
   const handlePinDigit = (d: string) => {
     if (pin.length >= 6) return;
@@ -175,96 +194,100 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onProg
       </TouchableOpacity>
 
       {/* ─── CASH DECLARATION MODAL ─────────────────────────── */}
-      <Modal visible={showCashDecl} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.cashModal}>
-            <Text style={styles.cashModalTitle}>Starting Cash Float</Text>
-            <Text style={styles.cashModalSub}>Welcome, {pendingUser?.fullName}. Enter the starting cash amount in the drawer before opening register.</Text>
-            <TextInput
-              style={styles.cashInput}
-              value={cashInput}
-              onChangeText={setCashInput}
-              keyboardType="decimal-pad"
-              placeholder="0.00"
-              placeholderTextColor={C.gray400}
-              autoFocus
-            />
-            <Text style={styles.cashHint}>₱ Starting Amount</Text>
-            <TouchableOpacity style={styles.cashConfirmBtn} onPress={handleCashDeclConfirm}>
-              <Text style={styles.cashConfirmText}>Open Register</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      {/* ─── PROGRAMMER SETTINGS MODAL ──────────────────────── */}
-      <Modal visible={showProgrammer} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.progModal}>
-            <View style={styles.progModalHeader}>
-              <Text style={styles.progModalTitle}>Engineer Diagnostics & Setup</Text>
-              <TouchableOpacity onPress={() => { setShowProgrammer(false); setProgrammerPin(""); setProgrammerError(""); }}>
-                <Text style={styles.closeBtn}>✕</Text>
+      {showCashDecl && (
+        <Modal visible={showCashDecl} transparent animationType="fade">
+          <View style={styles.modalOverlay}>
+            <View style={styles.cashModal}>
+              <Text style={styles.cashModalTitle}>Starting Cash Float</Text>
+              <Text style={styles.cashModalSub}>Welcome, {pendingUser?.fullName}. Enter the starting cash amount in the drawer before opening register.</Text>
+              <TextInput
+                style={styles.cashInput}
+                value={cashInput}
+                onChangeText={setCashInput}
+                keyboardType="decimal-pad"
+                placeholder="0.00"
+                placeholderTextColor={C.gray400}
+                autoFocus
+              />
+              <Text style={styles.cashHint}>₱ Starting Amount</Text>
+              <TouchableOpacity style={styles.cashConfirmBtn} onPress={handleCashDeclConfirm}>
+                <Text style={styles.cashConfirmText}>Open Register</Text>
               </TouchableOpacity>
             </View>
-
-            <ScrollView>
-              {/* PIN entry */}
-              <Text style={styles.progSection}>Programmer PIN</Text>
-              <TextInput
-                style={styles.progInput}
-                value={programmerPin}
-                onChangeText={setProgrammerPin}
-                secureTextEntry
-                keyboardType="number-pad"
-                maxLength={6}
-                placeholder="Enter programmer PIN"
-                placeholderTextColor={C.gray400}
-              />
-              {programmerError ? <Text style={styles.errorText}>{programmerError}</Text> : null}
-
-              {/* Server mode */}
-              <Text style={styles.progSection}>Server Connection</Text>
-              <View style={styles.segRow}>
-                {(["standalone","lan","cloud"] as const).map((m) => (
-                  <TouchableOpacity key={m} style={[styles.segBtn, serverMode===m && styles.segBtnActive]} onPress={() => setServerMode(m)}>
-                    <Text style={[styles.segBtnText, serverMode===m && styles.segBtnTextActive]}>{m.toUpperCase()}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-              {serverMode !== "standalone" && (
-                <View style={styles.inputRow}>
-                  <TextInput style={[styles.progInput, { flex: 2 }]} value={serverIp} onChangeText={setServerIp} placeholder="Server IP" placeholderTextColor={C.gray400} />
-                  <TextInput style={[styles.progInput, { flex: 1, marginLeft: 6 }]} value={serverPort} onChangeText={setServerPort} placeholder="Port" placeholderTextColor={C.gray400} keyboardType="number-pad" />
-                </View>
-              )}
-
-              {/* Feature toggles */}
-              <Text style={styles.progSection}>POS Feature Toggles</Text>
-              {[
-                ["Inventory Tracking", featInventory, setFeatInventory],
-                ["Cash Drawer Kick on Sale", featDrawer, setFeatDrawer],
-                ["Receipt Printing", featPrint, setFeatPrint],
-                ["Pricing Editor (Add/Edit Products)", featPricing, setFeatPricing],
-              ].map(([label, val, setter]: any) => (
-                <View key={label as string} style={styles.toggleRow}>
-                  <Text style={styles.toggleLabel}>{label as string}</Text>
-                  <Switch value={val as boolean} onValueChange={setter} trackColor={{ true: C.green }} />
-                </View>
-              ))}
-
-              {/* Show main form */}
-              <TouchableOpacity style={[styles.progActionBtn, { backgroundColor: C.green }]} onPress={handleProgrammerBypass}>
-                <Text style={styles.progActionBtnText}>✔ AUTHENTICATE & ENTER POS</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity style={[styles.progActionBtn, { backgroundColor: C.navy, marginTop: 6 }]} onPress={() => Alert.alert("SQL Console", "SQL scripting console would open here.")}>
-                <Text style={styles.progActionBtnText}>⚙ SQL Scripting Console</Text>
-              </TouchableOpacity>
-            </ScrollView>
           </View>
-        </View>
-      </Modal>
+        </Modal>
+      )}
+
+      {/* ─── PROGRAMMER SETTINGS MODAL ──────────────────────── */}
+      {showProgrammer && (
+        <Modal visible={showProgrammer} transparent animationType="slide">
+          <View style={styles.modalOverlay}>
+            <View style={styles.progModal}>
+              <View style={styles.progModalHeader}>
+                <Text style={styles.progModalTitle}>Engineer Diagnostics & Setup</Text>
+                <TouchableOpacity onPress={() => { setShowProgrammer(false); setProgrammerPin(""); setProgrammerError(""); }}>
+                  <Text style={styles.closeBtn}>✕</Text>
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView>
+                {/* PIN entry */}
+                <Text style={styles.progSection}>Programmer PIN</Text>
+                <TextInput
+                  style={styles.progInput}
+                  value={programmerPin}
+                  onChangeText={setProgrammerPin}
+                  secureTextEntry
+                  keyboardType="number-pad"
+                  maxLength={6}
+                  placeholder="Enter programmer PIN"
+                  placeholderTextColor={C.gray400}
+                />
+                {programmerError ? <Text style={styles.errorText}>{programmerError}</Text> : null}
+
+                {/* Server mode */}
+                <Text style={styles.progSection}>Server Connection</Text>
+                <View style={styles.segRow}>
+                  {(["standalone", "lan", "cloud"] as const).map((m) => (
+                    <TouchableOpacity key={m} style={[styles.segBtn, serverMode === m && styles.segBtnActive]} onPress={() => setServerMode(m)}>
+                      <Text style={[styles.segBtnText, serverMode === m && styles.segBtnTextActive]}>{m.toUpperCase()}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                {serverMode !== "standalone" && (
+                  <View style={styles.inputRow}>
+                    <TextInput style={[styles.progInput, { flex: 2 }]} value={serverIp} onChangeText={setServerIp} placeholder="Server IP" placeholderTextColor={C.gray400} />
+                    <TextInput style={[styles.progInput, { flex: 1, marginLeft: 6 }]} value={serverPort} onChangeText={setServerPort} placeholder="Port" placeholderTextColor={C.gray400} keyboardType="number-pad" />
+                  </View>
+                )}
+
+                {/* Feature toggles */}
+                <Text style={styles.progSection}>POS Feature Toggles</Text>
+                {[
+                  ["Inventory Tracking", featInventory, setFeatInventory],
+                  ["Cash Drawer Kick on Sale", featDrawer, setFeatDrawer],
+                  ["Receipt Printing", featPrint, setFeatPrint],
+                  ["Pricing Editor (Add/Edit Products)", featPricing, setFeatPricing],
+                ].map(([label, val, setter]: any) => (
+                  <View key={label as string} style={styles.toggleRow}>
+                    <Text style={styles.toggleLabel}>{label as string}</Text>
+                    <Switch value={val as boolean} onValueChange={setter} trackColor={{ true: C.green }} thumbColor={C.white} />
+                  </View>
+                ))}
+
+                {/* Launch button */}
+                <TouchableOpacity style={[styles.progActionBtn, { backgroundColor: C.green }]} onPress={handleProgrammerBypass}>
+                  <Text style={styles.progActionBtnText}>Launch POS as Engineer</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={[styles.progActionBtn, { backgroundColor: C.navy, marginTop: 6 }]} onPress={() => Alert.alert("SQL Console", "SQL scripting console ready.")}>
+                  <Text style={styles.progActionBtnText}>SQL Scripting Console</Text>
+                </TouchableOpacity>
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+      )}
     </SafeAreaView>
   );
 };

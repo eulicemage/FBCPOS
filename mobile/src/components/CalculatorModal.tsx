@@ -1,4 +1,4 @@
-﻿import React, { useState } from "react";
+import React, { useState } from "react";
 import {
   StyleSheet,
   View,
@@ -71,6 +71,8 @@ export const CalculatorModal: React.FC<CalculatorModalProps> = ({
     setOp(null);
     setFreshEntry(true);
   };
+
+  if (!visible) return null;
 
   return (
     <Modal visible={visible} transparent animationType="fade">

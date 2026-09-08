@@ -67,6 +67,8 @@ export const SyncStatusModal: React.FC<SyncStatusModalProps> = ({
 
   const isActuallyOnline = isOnline && !isSimulatedOffline;
 
+  if (!visible) return null;
+
   return (
     <Modal visible={visible} animationType="slide" transparent statusBarTranslucent>
       <View style={styles.overlay}>

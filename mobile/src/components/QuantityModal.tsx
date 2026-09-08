@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import {
   StyleSheet,
   View,
@@ -56,6 +56,8 @@ export const QuantityModal: React.FC<QuantityModalProps> = ({
     }
     onClose();
   };
+
+  if (!visible) return null;
 
   return (
     <Modal visible={visible} transparent animationType="fade">

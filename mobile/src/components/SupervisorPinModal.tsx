@@ -49,6 +49,8 @@ export const SupervisorPinModal: React.FC<SupervisorPinModalProps> = ({
     }
   };
 
+  if (!visible) return null;
+
   return (
     <Modal visible={visible} transparent animationType="fade">
       <View style={styles.overlay}>

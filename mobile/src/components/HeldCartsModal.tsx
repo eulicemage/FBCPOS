@@ -22,6 +22,8 @@ export const HeldCartsModal: React.FC<HeldCartsModalProps> = ({
 }) => {
   const { heldCarts, removeHeldCart } = useHeldCartStore();
 
+  if (!visible) return null;
+
   return (
     <Modal visible={visible} transparent animationType="fade">
       <View style={styles.overlay}>

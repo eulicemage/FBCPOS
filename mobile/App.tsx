@@ -1,6 +1,29 @@
 import React, { useState } from "react";
-import { StyleSheet, View, Alert, StatusBar } from "react-native";
+import { StyleSheet, View, Alert, StatusBar, Platform } from "react-native";
 import { POSScreen } from "./src/screens/POSScreen";
+
+// Global Web / Electron Alert Polyfill (react-native-web has empty Alert.alert)
+if (Platform.OS === "web" && typeof window !== "undefined") {
+  Alert.alert = (title: string, message?: string, buttons?: any[]) => {
+    const text = message ? `${title}\n\n${message}` : title;
+    if (buttons && buttons.length > 1) {
+      const confirmBtn = buttons.find((b: any) => b.style !== "cancel") || buttons[1];
+      const isConfirmed = window.confirm(text);
+      if (isConfirmed) {
+        confirmBtn?.onPress?.();
+      } else {
+        const cancelBtn = buttons.find((b: any) => b.style === "cancel") || buttons[0];
+        cancelBtn?.onPress?.();
+      }
+      return;
+    }
+    window.alert(text);
+    if (buttons && buttons[0]?.onPress) {
+      buttons[0].onPress();
+    }
+  };
+}
+
 import { LoginScreen } from "./src/screens/LoginScreen";
 import { TenderModal } from "./src/components/TenderModal";
 import { ReceiptModal } from "./src/components/ReceiptModal";
@@ -151,17 +174,21 @@ export default function App() {
         />
       )}
 
-      <TenderModal
-        visible={tenderVisible}
-        onClose={() => setTenderVisible(false)}
-        onCheckoutComplete={handleCheckoutComplete}
-      />
+      {tenderVisible && (
+        <TenderModal
+          visible={tenderVisible}
+          onClose={() => setTenderVisible(false)}
+          onCheckoutComplete={handleCheckoutComplete}
+        />
+      )}
 
-      <ReceiptModal
-        visible={receiptVisible}
-        sale={lastSale}
-        onNewSale={handleNewSale}
-      />
+      {receiptVisible && lastSale && (
+        <ReceiptModal
+          visible={receiptVisible}
+          sale={lastSale}
+          onNewSale={handleNewSale}
+        />
+      )}
     </View>
   );
 }

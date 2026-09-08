@@ -59,6 +59,8 @@ export const DiscountModal: React.FC<DiscountModalProps> = ({
     }
   };
 
+  if (!visible) return null;
+
   return (
     <Modal visible={visible} transparent animationType="fade">
       <View style={styles.overlay}>

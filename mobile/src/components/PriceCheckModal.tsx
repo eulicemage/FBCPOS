@@ -58,6 +58,8 @@ export const PriceCheckModal: React.FC<PriceCheckModalProps> = ({
     setResult(match || null);
   };
 
+  if (!visible) return null;
+
   return (
     <Modal visible={visible} transparent animationType="fade">
       <View style={styles.overlay}>

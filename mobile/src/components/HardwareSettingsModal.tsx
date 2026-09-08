@@ -69,6 +69,8 @@ export const HardwareSettingsModal: React.FC<HardwareSettingsModalProps> = ({
     }
   };
 
+  if (!visible) return null;
+
   return (
     <Modal visible={visible} animationType="slide" transparent statusBarTranslucent>
       <View style={styles.overlay}>

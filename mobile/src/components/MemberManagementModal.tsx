@@ -176,6 +176,8 @@ export const MemberManagementModal: React.FC<MemberManagementModalProps> = ({
     }
   };
 
+  if (!visible) return null;
+
   return (
     <Modal visible={visible} animationType="slide" transparent statusBarTranslucent>
       <View style={styles.overlay}>
